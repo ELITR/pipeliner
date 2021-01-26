@@ -68,6 +68,7 @@ class Pipeliner:
   def _netcatListen(self, port):
     return f"nc -lk localhost {port}"
 
+  # Redirect tee's stdout to /dev/null, or it's going to pollute the console
   def _splitOutputs(self, portsTo):
     return reduce(lambda acc,port: acc + f">{self._netcat(port)} ", portsTo, f"tee ") + "1>/dev/null"
   
@@ -144,7 +145,6 @@ class Pipeliner:
       if METRICS:
         teeArgs.append(f">(python3 ./metrics.py {edgeName})")
       if len(teeArgs) > 0:
-        # Redirect tee's stdout to /dev/null, or it's going to pollute the console
         pipes.append(f"{self._netcatListen(edge[0].egress[edgeFrom].pop())} | tee {' '.join(teeArgs)} | {self._netcat(edge[1].ingress[edgeTo].pop())}")
       else:
         pipes.append(f"{self._netcatListen(edge[0].egress[edgeFrom].pop())} | {self._netcat(edge[1].ingress[edgeTo].pop())}")

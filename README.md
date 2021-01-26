@@ -8,6 +8,8 @@ This repository contains tools to create and execute a *pipeline* -- various com
 
 `pip3 install -r requirements.txt`
 
+Make sure the `AVAILABLE_PORTS` variable in `src/pipeliner.py` contains a list of unused ports on the machine where the pipeline will be executed.
+
 ## How it works
 A pipeline is represented as a directed acyclic multigraph, whose vertices are individual components and edges are the connection between those components. Each component can have multiple inputs and multiple outputs. As mentioned before, almost all of the communication is done using localhost networking with ports. Each node gets assigned ports for it's inputs and outputs. For each outgoing edge from an output, that output gets a port. Similarly, each input also gets a port. The edges merely connect those assigned ports. This approach allows for easy debugging and logging by tapping into the connecting edge, where we can insert arbitrary tools, such as logging the traffic or measuring the throughput. 
 
