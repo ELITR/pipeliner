@@ -150,13 +150,33 @@ class Pipeliner:
         pipes.append(f"{self._netcatListen(edge[0].egress[edgeFrom].pop())} | {self._netcat(edge[1].ingress[edgeTo].pop())}")
     return pipes
 
+  # Catch SIGINT and properly terminate all children.
+  def _prologue(self):
+    print("""handler()
+  {
+      pkill -TERM -P $$
+  }
+trap handler SIGINT
+    """)
+  # Display .err logs for easier troubleshooting
+  def _epilogue(self):
+    if self.logging:
+      componentCount = len(self.graph.nodes)
+      print(f"tail -F -n {componentCount} {self.logsDir}/*.err")
+    
+
   # Generate a bash pipeline for connecting all of the components
   def createPipeline(self):
     commands = []
     commands += self._createProxies()
     commands += self._executeLocalResources()
-    self._reportEntrypoints()
     commands += self._createPipes()
+
+    if self.logging:
+      componentCount = len(self.graph.nodes)
+      commands += [f"tail -F -n {componentCount} {self.logsDir}/*.err"]
+    self._prologue()
+    self._reportEntrypoints()
     print(" &\n".join(commands))
     
   def draw(self):

@@ -103,8 +103,8 @@ To see a (bit crude) visualization of the created graph, use `p.draw` (make sure
 # TODO (documentation)
 - docker nodes
 - metrics
+- kill all processes on exiting
+- capture stderr of all processes and display it on the console
 
 # TODO (code)
 - crash on failure
-- kill all processes on exiting
-- capture stderr of all processes and display it on the console
