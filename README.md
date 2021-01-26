@@ -97,6 +97,8 @@ p = Pipeliner(logsDir="./logs")
 
 Then, either enable logging on all edges with `p.logging = True`, or specify the edges you want to be logged with the `isLogged` param: `p.addEdge(fromComponent, "outputName", toComponent, "inputName", isLogged=True)`. The data flowing on that edge will also be captured to a file named `{outputName}2{inputName}.log` file in the specified logging folder.
 
+## Visualization
+To see a (bit crude) visualization of the created graph, use `p.draw` (make sure you got `matplotlib` installed).
 
 # TODO (documentation)
 - docker nodes
