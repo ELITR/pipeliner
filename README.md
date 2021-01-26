@@ -16,7 +16,7 @@ A pipeline is represented as a directed acyclic multigraph, whose vertices are i
 First, import the `Pipeliner` class from `pipeliner.py` and instantiate it. The finished example script described in this section is located at `src/example.py`.
 
 ```python
-import pipeliner from Pipeliner
+from pipeliner import Pipeliner
 
 p = Pipeliner()
 ```
