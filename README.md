@@ -53,7 +53,7 @@ Now, add an edge between those two components. We want to connect the `uppercase
 p.addEdge(uppercaser, "uppercased", logger, "toBeLogged")
 ```
 
-When we create the pipeline with `createPipeline()` now, you'll see something like this printed out:
+When we create the pipeline with `p.createPipeline()` now, you'll see something like this printed out:
 
 ```bash
 # uppercaser entrypoint: [9199]
@@ -64,12 +64,43 @@ nc -lk localhost 9198 | (while ! nc -z localhost 9197; do sleep 1; done; nc loca
 
 The first line tells us the entrypoint of the `uppercaser` component - a port number on localhost. On the second and third line our two components are executed, and the last line is the edge connecting those two components together. To try it out, save the input into `pipeline.sh`,execute the pipeline with `bash pipeline.sh` and connect to the `uppercaser`'s entrypoint with `nc localhost 9199`, while observing the log file with `tail -F /tmp/saved.txt`. Type something to the `nc` and you should see that text uppercased in the `tail`.
 
+## Forking
+
+Suppose we want to add another logger. Simply create another node and edge, and the `Pipeliner` will automatically split the data.
+
+```python
+logger2 = p.addLocalNode("logger2", {"toBeLogged": "stdin"}, {}, "cat >/tmp/saved2.txt")
+p.addEdge(uppercaser, "uppercased", logger2, "toBeLogged")
+```
+
+`createPipeline()` yields the following: 
+
+```bash
+# uppercaser entrypoint: [9199]
+nc -lk localhost 9199 | stdbuf -o0 tr [:lower:] [:upper:] | tee >(while ! nc -z localhost 9198; do sleep 1; done; nc localhost 9198) >(while ! nc -z localhost 9197; do sleep 1; done; nc localhost 9197) 1>/dev/null &
+nc -lk localhost 9196 | stdbuf -o0 cat >/tmp/saved2.txt &
+nc -lk localhost 9195 | stdbuf -o0 cat >/tmp/saved.txt &
+nc -lk localhost 9197 | (while ! nc -z localhost 9195; do sleep 1; done; nc localhost 9195) &
+nc -lk localhost 9198 | (while ! nc -z localhost 9196; do sleep 1; done; nc localhost 9196)
+```
+Observe that the output of `tr` is captured to two ports, `9198` and `9197`, which are eventually connected to the loggers.
+
+
+## Logging
+To enable automated logging, first provide the directory where the logs should be stored to `Pipeliner`'s constructor (default is `/dev/null`).
+
+```python
+p = Pipeliner(logsDir="./logs")
+```
+
+Then, either enable logging on all edges with `p.logging = True`, or specify the edges you want to be logged with the `isLogged` param: `p.addEdge(fromComponent, "outputName", toComponent, "inputName", isLogged=True)`. The data flowing on that edge will also be captured to a file named `{outputName}2{inputName}.log` file in the specified logging folder.
+
+
 # TODO (documentation)
 - docker nodes
-- forking
-- logging
 - metrics
 
 # TODO (code)
 - crash on failure
 - kill all processes on exiting
+- capture stderr of all processes and display it on the console

@@ -8,9 +8,11 @@ from collections import Counter
 # Used for transferring data between stdout and stdins
 AVAILABLE_PORTS = list(range(9100, 9200))
 
-
 # Enable TICK-stack based metrics of all pipes
 METRICS = False
+
+# Because Python does not have a default function for list flattening
+flatten = lambda t: [item for sublist in t for item in sublist]
 
 class Pipeliner:
   def __init__(self, logsDir="/dev/null"):
@@ -46,6 +48,11 @@ class Pipeliner:
     return self.LocalNode(name, ingress, egress, code)
 
   def addEdge(self, source, sourceOutput, target, targetInput, isLogged=False):
+    if sourceOutput not in source.egress.keys():
+      raise Exception(f"Node {source.name} does not have an output named {sourceOutput}")
+    if targetInput not in target.ingress.keys():
+      raise Exception(f"Node {target.name} does not have an input named {targetInput}")
+
     self.graph.add_edge(source, target, info={
       "from": sourceOutput,
       "to": targetInput,
@@ -70,7 +77,6 @@ class Pipeliner:
     proxies = []
     for node in nx.topological_sort(self.graph):
       
-      flatten = lambda t: [item for sublist in t for item in sublist]
       inputTypes = flatten(node.ingress.values())
       # Check the count of outgoing edges from the outputs of the node
       for oc in Counter([edge[2]["info"]["from"] for edge in self.graph.out_edges(node, data=True)]).items():
@@ -117,10 +123,10 @@ class Pipeliner:
       commands.append(command)
     return commands
 
-  # Print out entrypoints (nodes that have inputs, but no incoming edges)
+  # Print out entrypoints (nodes that have stdin inputs, but no incoming edges)
   def _reportEntrypoints(self):
     for node in self.graph.nodes:
-      if self.graph.in_degree(node) == 0 and self.graph.out_degree(node) > 0:
+      if self.graph.in_degree(node) == 0 and self.graph.out_degree(node) > 0 and node.stdinName:
         print(f"# {node.name} entrypoint: {node.ingress[node.stdinName]}")
 
   # Create pipes between the components, as specified by the edges of the graph.
@@ -169,31 +175,3 @@ services:
     for resource in filter(lambda r: isinstance(r, self.DockerNode), self.resources.values()):
       compose += resource.composeDefinition
     return compose
-
-####################
-
-'''
-pipeliner = Pipeliner()
-
-asr = pipeliner._addDockerNode("asr", composeDefinition="""
-  asr:
-    build: ./asr
-    ports:
-      - 1234:1234
-""", ingress={
-  "voice": 1234
-}, egress={
-  "transcription": 1234
-})
-
-mockAudio = pipeliner.registerLocalResource("mockAudio", ingress={}, egress={"audio": "stdout"}, code="nc -lk 4321")
-mockOutput1 = pipeliner.registerLocalResource("mockOutput1", ingress={"logging": 1236}, egress={}, code="nc -lk localhost 1236 > /tmp/mockOutput1.txt ")
-mockOutput2 = pipeliner.registerLocalResource("mockOutput2", ingress={"logging": "stdin"}, egress={}, code="cat > /tmp/mockOutput2.txt ")
-
-pipeliner.registerPipe(mockAudio, "audio", asr, "voice")
-pipeliner.registerPipe(asr, "transcription", mockOutput2, "logging", isLogged=True)
-pipeliner.registerPipe(asr, "transcription", mockOutput1, "logging")
-
-# pipeliner.draw()
-pipeliner.createPipeline()
-'''
