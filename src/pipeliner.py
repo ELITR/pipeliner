@@ -3,8 +3,8 @@ import networkx as nx
 from functools import reduce
 import matplotlib.pyplot as plt
 from collections import Counter
+from datetime import datetime
 
-# List of ports that are guaranteed to be available on the machine
 # Used for transferring data between stdout and stdins
 AVAILABLE_PORTS = list(range(9100, 9200))
 
@@ -15,13 +15,15 @@ METRICS = False
 flatten = lambda t: [item for sublist in t for item in sublist]
 
 class Pipeliner:
-  def __init__(self, logsDir="/dev/null"):
+  def __init__(self, logsDir="/dev/null", availablePorts=list(range(9100,9200))):
     self.graph = nx.MultiDiGraph()
     self.resources = {}
-    self.logsDir = logsDir
+    self.logsDir = logsDir + "/" + datetime.today().strftime('%Y%m%d-%H%M%S') 
     self.logging = False
     self.metrics = False
-    self._unbuffered = "stdbuf -o0 "
+    # List of ports that are guaranteed to be available on the machine
+    self.availablePorts = availablePorts
+    self._unbuffered = "stdbuf -oL "
 
   class Node:
     def __init__(self, name, ingress, egress):
@@ -87,8 +89,8 @@ class Pipeliner:
         # The output is also an input (a socket is both receiving data and sending processed data)
         # Create a proxy port for that input
         if outputType in inputTypes:
-          proxyOutputPorts = [AVAILABLE_PORTS.pop() for x in range(count)]
-          proxyInputPort = AVAILABLE_PORTS.pop()
+          proxyOutputPorts = [self.availablePorts.pop() for x in range(count)]
+          proxyInputPort = self.availablePorts.pop()
           node.egress[outputName] = proxyOutputPorts
           inputName = next((x for x in node.ingress.keys() if outputType in node.ingress[x]))
           node.ingress[inputName] = [proxyInputPort]
@@ -105,7 +107,7 @@ class Pipeliner:
       command = ""
       
       if node.stdinName:
-        stdinPort = AVAILABLE_PORTS.pop()
+        stdinPort = self.availablePorts.pop()
         node.ingress[node.stdinName] = [stdinPort]
         command += f"{self._netcatListen(stdinPort)} | "
 
@@ -117,7 +119,7 @@ class Pipeliner:
 
       edgesFromStdout = [edge for edge in self.graph.out_edges(node, data=True) if edge[2]["info"]["from"] == node.stdoutName]
       if len(edgesFromStdout) > 0:
-        stdoutPorts = [AVAILABLE_PORTS.pop() for e in edgesFromStdout]
+        stdoutPorts = [self.availablePorts.pop() for e in edgesFromStdout]
         node.egress[node.stdoutName] = stdoutPorts
         command += f" | {self._splitOutputs(stdoutPorts)}"
       
@@ -158,6 +160,9 @@ class Pipeliner:
   }
 trap handler SIGINT
     """)
+    if self.logging:
+      print(f"mkdir {self.logsDir}")
+
   # Display .err logs for easier troubleshooting
   def _epilogue(self):
     if self.logging:

@@ -1,0 +1,12 @@
+version: "3.8"
+services:
+  cruise-control:
+    image: cruise-control:latest
+    network_mode: host
+    ports:
+      - 5000:5000
+      - 5001:5001
+    volumes:
+      - ./pwd:/pwd
+      - ./src:/src
+    entrypoint: tail -F /dev/null
