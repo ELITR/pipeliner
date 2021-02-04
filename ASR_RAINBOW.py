@@ -3,7 +3,7 @@ from src.pipeliner import Pipeliner
 # To see the bind mounts, see the docker-compose.yaml file.
 # If executing locally, change the paths to executables.
 
-TEXTFLOW = "ws://127.0.0.1:5002/textflow"
+TEXTFLOW = "ws://slt.ufal.mff.cuni.cz:5000/textflow"
 
 p = Pipeliner(logsDir="/pwd/logs")
 
@@ -23,16 +23,17 @@ splitter_langs = ["cs", "de"]
 splitter_ports = [p.availablePorts.pop() for lang in splitter_langs]
 splitter = p.addLocalNode("rainbow_mt_splitter", {"source": "stdin"}, {lp[0]: lp[1] for lp in zip(splitter_langs, splitter_ports)}, f"python3 /src/rainbow_splitter.py {' '.join(splitter_langs)} {' '.join(map(lambda p: str(p), splitter_ports))}")
 
+'''
 for lang in splitter_langs:
         flow = p.addLocalNode(f"{lang}_online_text_flow", {"sentences": "stdin"}, {}, f"online-text-flow-client {lang} {TEXTFLOW} -b")
         p.addEdge(splitter, lang, flow, "sentences")
-
+'''
 p.addEdge(audioRecording, "audiorecord", asr, "audio")
 p.addEdge(asr, "transcription", events, "asrOutput")
 p.addEdge(events, "processed", en_online_text_flow, "sentences")
-
+'''
 p.addEdge(asr, "transcription", KIT_rainbow_mt, "source")
 p.addEdge(KIT_rainbow_mt, "targets", splitter, "source")
-
+'''
 p.logging = True
 p.createPipeline()
