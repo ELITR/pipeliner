@@ -161,7 +161,7 @@ class Pipeliner:
 trap handler SIGINT
     """)
     if self.logging:
-      print(f"mkdir {self.logsDir}")
+      print(f"mkdir -p {self.logsDir}")
 
   # Display .err logs for easier troubleshooting
   def _epilogue(self):
