@@ -18,8 +18,7 @@ class Pipeliner:
   def __init__(self, logsDir="/dev/null", availablePorts=list(range(9100,9200))):
     self.graph = nx.MultiDiGraph()
     self.resources = {}
-    self.logsDir = logsDir + "/" + datetime.today().strftime('%Y%m%d-%H%M%S') 
-    self.logging = False
+    self.logsDir = logsDir if logsDir == "/dev/null" else logsDir + "/$DATE"
     self.metrics = False
     # List of ports that are guaranteed to be available on the machine
     self.availablePorts = availablePorts
@@ -58,7 +57,6 @@ class Pipeliner:
     self.graph.add_edge(source, target, info={
       "from": sourceOutput,
       "to": targetInput,
-      "isLogged": isLogged,
       "name": f"{sourceOutput}2{targetInput}"
     })
 
@@ -114,8 +112,7 @@ class Pipeliner:
       # Don't buffer the componen'ts output.
       command += self._unbuffered + node.code
 
-      if self.logging:
-        command += f" 2>{self.logsDir}/{node.name}.err"
+      command += f" 2>{self.logsDir}/{node.name}.err"
 
       edgesFromStdout = [edge for edge in self.graph.out_edges(node, data=True) if edge[2]["info"]["from"] == node.stdoutName]
       if len(edgesFromStdout) > 0:
@@ -142,8 +139,7 @@ class Pipeliner:
       edgeName = edgeInfo["name"]
 
       teeArgs = []
-      if self.logging or edgeInfo["isLogged"]:
-       teeArgs.append(f"{self.logsDir}/{edgeInfo['name']}.log ") 
+      teeArgs.append(f"{self.logsDir}/{edgeInfo['name']}.log ") 
       if METRICS:
         teeArgs.append(f">(python3 ./metrics.py {edgeName})")
       if len(teeArgs) > 0:
@@ -160,26 +156,20 @@ class Pipeliner:
   }
 trap handler SIGINT
     """)
-    if self.logging:
-      print(f"mkdir -p {self.logsDir}")
-
-  # Display .err logs for easier troubleshooting
-  def _epilogue(self):
-    if self.logging:
-      componentCount = len(self.graph.nodes)
-      print(f"tail -F -n {componentCount} {self.logsDir}/*.err")
-    
+    print(f"""DATE=$(date '+%Y-%m-%d-%H:%M:%S')
+mkdir -p {self.logsDir}/$DATE
+      """)
 
   # Generate a bash pipeline for connecting all of the components
   def createPipeline(self):
+
     commands = []
     commands += self._createProxies()
     commands += self._executeLocalResources()
     commands += self._createPipes()
 
-    if self.logging:
-      componentCount = len(self.graph.nodes)
-      commands += [f"tail -F -n {componentCount} {self.logsDir}/*.err"]
+    componentCount = len(self.graph.nodes)
+    commands += [f"tail -F -n {componentCount} {self.logsDir}/*.err"]
     self._prologue()
     self._reportEntrypoints()
     print(" &\n".join(commands))

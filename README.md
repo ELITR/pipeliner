@@ -6,7 +6,7 @@ This repository contains tools to create and execute a *pipeline* -- various com
 - networkx 
 - (optional, for visualization) matplotlib
 
-`pip3 install -r requirements.txt`
+`pip install -r requirements.txt`
 
 Make sure the `AVAILABLE_PORTS` variable in `src/pipeliner.py` contains a list of unused ports on the machine where the pipeline will be executed.
 
@@ -89,13 +89,13 @@ Observe that the output of `tr` is captured to two ports, `9198` and `9197`, whi
 
 
 ## Logging
-To enable automated logging, first provide the directory where the logs should be stored to `Pipeliner`'s constructor (default is `/dev/null`). A subdirectory with the current timestamp will be created.
+To enable automated logging, first provide the directory where the logs should be stored to `Pipeliner`'s constructor (default is `/dev/null`, i.e. no logs). A subdirectory with the current timestamp will be created.
 
 ```python
 p = Pipeliner(logsDir="./logs")
 ```
 
-Then, either enable logging on all edges with `p.logging = True`, or specify the edges you want to be logged with the `isLogged` param: `p.addEdge(fromComponent, "outputName", toComponent, "inputName", isLogged=True)`. The data flowing on that edge will also be captured to a file named `{outputName}2{inputName}.log` file in the specified logging folder.
+ The data flowing on all edges will also be captured to a file named `{outputName}2{inputName}.log` file in the specified logging folder.
 
 ## Visualization
 To see a (bit crude) visualization of the created graph, use `p.draw` (make sure you got `matplotlib` installed).
