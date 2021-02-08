@@ -157,7 +157,7 @@ class Pipeliner:
 trap handler SIGINT
     """)
     print(f"""DATE=$(date '+%Y-%m-%d-%H:%M:%S')
-mkdir -p {self.logsDir}/$DATE
+mkdir -p {self.logsDir}
       """)
 
   # Generate a bash pipeline for connecting all of the components
