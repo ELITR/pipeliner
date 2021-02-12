@@ -1,4 +1,5 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
+# run the python3 from your environment, not forcefully /usr/bin/
 
 '''
 # OCTOCAT
