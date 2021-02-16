@@ -38,10 +38,17 @@ class Socket(threading.Thread):
         self.is_running = True
 
     def run(self):
-        server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        server.setblocking(False)
-        server.bind(('0.0.0.0', self.port))
-        server.listen()
+        while True:
+            try:
+                server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                server.setblocking(False)
+                server.bind(('0.0.0.0', self.port))
+                server.listen()
+                break
+            except:
+                logging.error(f'port {self.port} in use, retrying to connect...')
+                time.sleep(1)
+
 
         with open(self.preview, 'wb') as preview:
             while self.is_running:
@@ -109,15 +116,14 @@ def read_select(inputs):
         return list(inputs.items())[0][1]
 
 def main(args):
-    if args.debug:
-        root = logging.getLogger()
-        root.setLevel(logging.DEBUG)
+    root = logging.getLogger()
+    root.setLevel(logging.DEBUG if args.debug else logging.ERROR)
 
-        handler = logging.StreamHandler(sys.stderr)
-        handler.setLevel(logging.DEBUG)
-        formatter = logging.Formatter('[%(asctime)12s %(levelname)s %(filename)s:%(lineno)3d] %(message)s')
-        handler.setFormatter(formatter)
-        root.addHandler(handler)
+    handler = logging.StreamHandler(sys.stderr)
+    handler.setLevel(logging.DEBUG)
+    formatter = logging.Formatter('[%(asctime)12s %(levelname)s %(filename)s:%(lineno)3d] %(message)s')
+    handler.setFormatter(formatter)
+    root.addHandler(handler)
 
     inputs = load_inputs()
 
