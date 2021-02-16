@@ -26,6 +26,7 @@ import threading
 import queue
 import time
 import select
+import logging
 
 class Socket(threading.Thread):
     def __init__(self, preview, port):
@@ -46,9 +47,11 @@ class Socket(threading.Thread):
             while self.is_running:
                 try:
                     ready = select.select([server],[],[],1)
+                    logging.debug(f'waiting for a connection on port {self.port}')
                     if not ready[0]:
                         continue
                     conn, _ = server.accept()
+                    logging.debug(f'got connection on port {self.port}')
                     conn.setblocking(False)
                     with conn:
                         while self.is_running:
@@ -63,6 +66,7 @@ class Socket(threading.Thread):
                             preview.write(data)
                             preview.flush()
                 except socket.error:
+                    logging.error(f'connection error on port {self.port}')
                     continue
 
 class Stdin(threading.Thread):
@@ -89,20 +93,32 @@ def load_inputs():
         name = i.split('/')[-1].replace('.in', '')
         if f == 'stdin':
             inputs[name] = Stdin(preview)
+            logging.debug(f'input {f}: STD IN')
         else:
             port = int(f)
             inputs[name] = Socket(preview, port)
+            logging.debug(f'input {f}: socket on port {port}')
     return inputs
 
 def read_select(inputs):
     try:
         s = open('SELECT').readline().strip()
-        if s in inputs.keys():
-            return inputs[s]
+        return inputs[s]
     except:
-        return list(inputs)[0]
+        logging.error(f'invalid entry in SELECT; valid entries: {list(inputs.keys())}')
+        return list(inputs.items())[0][1]
 
 def main(args):
+    if args.debug:
+        root = logging.getLogger()
+        root.setLevel(logging.DEBUG)
+
+        handler = logging.StreamHandler(sys.stderr)
+        handler.setLevel(logging.DEBUG)
+        formatter = logging.Formatter('[%(asctime)12s %(levelname)s %(filename)s:%(lineno)3d] %(message)s')
+        handler.setFormatter(formatter)
+        root.addHandler(handler)
+
     inputs = load_inputs()
 
     for _, input in inputs.items():
@@ -114,16 +130,22 @@ def main(args):
     while True:    
         try:
             start = time.time()
+            read_len = 0
             while True:
                 try:
                     data = select.queue.get(timeout=args.interval)
+                    read_len += len(data)
                     sys.stdout.buffer.write(data)
                     sys.stdout.buffer.flush()
                 except queue.Empty:
                     if select2 is not None:
+                        read_len = 0
                         select = select2
                         select2 = None
+                        logging.debug('changed source')
+                        break
                 if time.time() - start > args.interval:
+                    logging.debug(f'read {read_len} bytes during last {time.time() - start} seconds')
                     select2 = read_select(inputs)
                     if select2 != select:
                         select.read = False
@@ -138,8 +160,10 @@ def main(args):
             break
 
 if __name__ == '__main__':
+    global args
     parser = argparse.ArgumentParser()
     parser.add_argument('--interval', default=0.5, type=int)
+    parser.add_argument('--debug', default=False, action='store_true')
 
     args = parser.parse_args()
     main(args)
