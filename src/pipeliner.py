@@ -6,7 +6,7 @@ from collections import Counter
 from datetime import datetime
 
 # Used for transferring data between stdout and stdins
-AVAILABLE_PORTS = list(range(9100, 9200))
+AVAILABLE_PORTS = list(range(9000, 9900))
 
 # Enable TICK-stack based metrics of all pipes
 METRICS = False
@@ -129,6 +129,18 @@ class Pipeliner:
       if self.graph.in_degree(node) == 0 and self.graph.out_degree(node) > 0 and node.stdinName:
         print(f"# {node.name} entrypoint: {node.ingress[node.stdinName]}")
 
+  def _sanityCheck(self):
+    # Check if there are more than one edge to an ingress.
+    # Consider using the octocat tool, if you need to connect more than one outputs to a single input
+    for node in self.graph.nodes:
+      if self.graph.in_degree(node) > 1:
+        inEdges = self.graph.in_edges(node, data=True)
+        edgeNames = set(map(lambda e: e[2]["info"]["to"], inEdges))
+        if len(edgeNames) < self.graph.in_degree(node):
+          raise Exception(f"Multiple incoming outputs: [{' '.join(edgeNames)}] to an input of node {node.name}. Did you mean to use octocat?")
+
+
+
   # Create pipes between the components, as specified by the edges of the graph.
   def _createPipes(self):
     pipes = []
@@ -163,6 +175,7 @@ mkdir -p {self.logsDir}
   # Generate a bash pipeline for connecting all of the components
   def createPipeline(self):
 
+    self._sanityCheck()
     commands = []
     commands += self._createProxies()
     commands += self._executeLocalResources()
