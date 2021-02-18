@@ -23,6 +23,7 @@ class Pipeliner:
     # List of ports that are guaranteed to be available on the machine
     self.availablePorts = availablePorts
     self._unbuffered = "stdbuf -oL "
+    self._label = ""
 
   class Node:
     def __init__(self, name, ingress, egress):
@@ -42,19 +43,22 @@ class Pipeliner:
   def addLocalNode(self, name, ingress, egress, code):
     return self.LocalNode(name, ingress, egress, code)
 
-  def addEdge(self, source, sourceOutput, target, targetInput):
+  def addEdge(self, source, sourceOutput, target, targetInput, type="text"):
     if sourceOutput not in source.egress.keys():
       raise Exception(f"Node {source.name} does not have an output named {sourceOutput}")
     if targetInput not in target.ingress.keys():
       raise Exception(f"Node {target.name} does not have an input named {targetInput}")
+    if type not in ["binary", "text", "none"]:
+      raise Exception(f"Unsupported edge type: {type}")
 
     self.graph.add_edge(source, target, info={
       "from": sourceOutput,
       "to": targetInput,
-      "name": f"{sourceOutput}2{targetInput}"
+      "name": f"{sourceOutput}2{targetInput}",
+      "type": type
     })
   
-  def addSimpleEdge(self, source, target):
+  def addSimpleEdge(self, source, target, type="text"):
     if len(source.egress.keys()) > 1:
       raise Exception(f"Node {source.name} has more than one output. Use addEdge() and specify the output.")
     if len(target.ingress.keys()) > 1:
@@ -62,7 +66,7 @@ class Pipeliner:
     
     sourceOutput = list(source.egress.keys())[0]
     targetInput = list(target.ingress.keys())[0]
-    self.addEdge(source, sourceOutput, target, targetInput)
+    self.addEdge(source, sourceOutput, target, targetInput, type=type)
 
   # Wait for the port to open, before actually connecting to it.
   def _netcat(self, port):
@@ -116,7 +120,7 @@ class Pipeliner:
       # Don't buffer the componen'ts output.
       command += self._unbuffered + node.code
 
-      command += f" 2>{self.logsDir}/{node.name}.err"
+      command += f" 2>{self.logsDir}/{node.label}-{node.name}.err"
 
       edgesFromStdout = [edge for edge in self.graph.out_edges(node, data=True) if edge[2]["info"]["from"] == node.stdoutName]
       if len(edgesFromStdout) > 0:
@@ -143,6 +147,14 @@ class Pipeliner:
         if len(edgeNames) < self.graph.in_degree(node):
           raise Exception(f"Multiple incoming outputs: [{' '.join(edgeNames)}] to an input of node {node.name}. Did you mean to use octocat?")
 
+  # Labels the nodes so their logs are roughly in the same order as the dataflow
+  def _labelNodes(self):
+    counter = 0
+    for node in nx.dfs_preorder_nodes(self.graph):
+      node.label = str(counter).zfill(2)
+      counter += 1
+
+
   # Create pipes between the components, as specified by the edges of the graph.
   def _createPipes(self):
     pipes = []
@@ -151,9 +163,15 @@ class Pipeliner:
       edgeFrom = edgeInfo["from"]
       edgeTo = edgeInfo["to"]
       edgeName = edgeInfo["name"]
+      edgeType = edgeInfo["type"]
 
       teeArgs = []
-      teeArgs.append(f"{self.logsDir}/{edgeInfo['name']}.log ") 
+      if edgeType == "binary": # No timestamps
+        teeArgs.append(f"{self.logsDir}/{edgeInfo['name']}.data ") 
+      elif edgeType == "text": # Timestamp each line
+        teeArgs.append(f">(ts '[%Y-%m-%d %H:%M:%S]' > {self.logsDir}/{edgeInfo['name']}.log)") 
+      elif edgeType == "none":
+        teeArgs.append(f"{self.logsDir}/{edgeInfo['name']}.log")
       if METRICS:
         teeArgs.append(f">(python3 ./metrics.py {edgeName})")
       if len(teeArgs) > 0:
@@ -178,6 +196,7 @@ mkdir -p {self.logsDir}
   def createPipeline(self):
 
     self._sanityCheck()
+    self._labelNodes()
     commands = []
     commands += self._createProxies()
     commands += self._executeLocalResources()

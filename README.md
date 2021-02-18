@@ -105,6 +105,13 @@ p = Pipeliner(logsDir="./logs")
 
  The data flowing on all edges will also be captured to a file named `{outputName}2{inputName}.log` file in the specified logging folder.
 
+By default, every edge is logged with timestamps per each row. To change this behavior, set the `type` parameter in the `addEdge()` function. Default value is `"text"`. Supported values:
+- "none": No timestamps. Suffix: `log`
+- "binary": No timestamps. Suffix: `.data`
+- "text": Timestamps per row. Suffix: `.log`.
+
+Stderr of each vertex is also captured by default. They're labeled in DFS-preorder order.
+
 ## Visualization
 To see a (bit crude) visualization of the created graph, use `p.draw` (make sure you got `matplotlib` installed).
 
@@ -117,6 +124,8 @@ audioRecording = p.addLocalNode("audioRecording", {}, {"audiorecord": "stdout"},
 ```
 and then from the host machine, run `arecord -f S16_LE -c1 -r 16000 -t raw -D default | nc localhost 5000`, which transmits the audio to the container. One upside of this port-based approach is you can start and stop the `arecord` without bringing the whole pipeline down. 
 
+# Development
+There's a `docker-compose.yaml` file included in the repo intended for developmental work. It's main use is to bind-mount the Python scripts to the cruise-control image, so the compiled tools are available for debugging when developing.
 
 # TODO (documentation)
 - metrics
