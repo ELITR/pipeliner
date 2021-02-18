@@ -4,8 +4,8 @@ services:
     image: cruise-control:latest
     network_mode: host
     ports:
-      - 5000:5000
-      - 5001:5001
+      - 5010:5010
+      - 5011:5011
     volumes:
       - ./pwd:/pwd
       - ./src:/src
