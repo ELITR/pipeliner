@@ -26,29 +26,23 @@ class Pipeliner:
 
   class Node:
     def __init__(self, name, ingress, egress):
+      if len(ingress.items()) == 0 and len(egress.items()) == 0:
+        raise Exception(f"Node {name} does not have any input or output.")
       self.name = name
       self.ingress = {key: [val] for key,val in ingress.items()}
       self.stdinName = next((k for k,v in ingress.items() if v == "stdin"), None)
       self.egress = {key: [val] for key, val in egress.items()}
       self.stdoutName = next((k for k,v in egress.items() if v == "stdout"), None)
 
-  class DockerNode(Node):
-    def __init__(self, name, ingress, egress, composeDefinition=None):
-      super().__init__(name, ingress, egress)
-      self.composeDefinition = composeDefinition
-
   class LocalNode(Node):
     def __init__(self, name, ingress, egress, code=None):
       super().__init__(name, ingress, egress)
       self.code = code
 
-  def addDockerNode(self, name, ingress, egress, composeDefinition=None):
-    return self.DockerNode(name, ingress, egress, composeDefinition)
-
   def addLocalNode(self, name, ingress, egress, code):
     return self.LocalNode(name, ingress, egress, code)
 
-  def addEdge(self, source, sourceOutput, target, targetInput, isLogged=False):
+  def addEdge(self, source, sourceOutput, target, targetInput):
     if sourceOutput not in source.egress.keys():
       raise Exception(f"Node {source.name} does not have an output named {sourceOutput}")
     if targetInput not in target.ingress.keys():
@@ -59,6 +53,16 @@ class Pipeliner:
       "to": targetInput,
       "name": f"{sourceOutput}2{targetInput}"
     })
+  
+  def addSimpleEdge(self, source, target):
+    if len(source.egress.keys()) > 1:
+      raise Exception(f"Node {source.name} has more than one output. Use addEdge() and specify the output.")
+    if len(target.ingress.keys()) > 1:
+      raise Exception(f"Node {target.name} has more than one input. Use addEdge() and specify the input.")
+    
+    sourceOutput = list(source.egress.keys())[0]
+    targetInput = list(target.ingress.keys())[0]
+    self.addEdge(source, sourceOutput, target, targetInput)
 
   # Wait for the port to open, before actually connecting to it.
   def _netcat(self, port):
@@ -139,8 +143,6 @@ class Pipeliner:
         if len(edgeNames) < self.graph.in_degree(node):
           raise Exception(f"Multiple incoming outputs: [{' '.join(edgeNames)}] to an input of node {node.name}. Did you mean to use octocat?")
 
-
-
   # Create pipes between the components, as specified by the edges of the graph.
   def _createPipes(self):
     pipes = []
@@ -194,12 +196,3 @@ mkdir -p {self.logsDir}
     nx.draw(self.graph, pos, labels=labels, with_labels=True, arrowsize=30, font_size=20)
     nx.draw_networkx_edge_labels(self.graph, pos)
     plt.show()
-
-  def generateDockerCompose(self):
-    compose = """
-version: "3.8"
-services:
-    """
-    for resource in filter(lambda r: isinstance(r, self.DockerNode), self.resources.values()):
-      compose += resource.composeDefinition
-    return compose

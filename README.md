@@ -66,6 +66,14 @@ nc -lk localhost 9198 | (while ! nc -z localhost 9197; do sleep 1; done; nc loca
 
 The first line tells us the entrypoint of the `uppercaser` component - a port number on localhost. On the second and third line our two components are executed, and the last line is the edge connecting those two components together. To try it out, save the input into `pipeline.sh`,execute the pipeline with `bash pipeline.sh` and connect to the `uppercaser`'s entrypoint with `nc localhost 9199`, while observing the log file with `tail -F /tmp/saved.txt`. Type something to the `nc` and you should see that text uppercased in the `tail`.
 
+### Simple Edges
+Because most of the edges are between vertices that have a single output and a single input, it can be a bit tedious to specify the name of the output and the input. In this case, you can use the `addSimpleEdge` syntax:
+```python
+# This is the same as p.addEdge(uppercaser, "uppercased", logger, "toBeLogged")
+# Because uppercaser has only one output and logger has only one input
+p.addSimpleEdge(uppercaser, logger)
+```
+
 ## Forking
 
 Suppose we want to add another logger. Simply create another node and edge, and the `Pipeliner` will automatically split the data.
@@ -111,7 +119,6 @@ and then from the host machine, run `arecord -f S16_LE -c1 -r 16000 -t raw -D de
 
 
 # TODO (documentation)
-- docker nodes
 - metrics
 - stderr output
 - kill all workers on exit
