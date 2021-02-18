@@ -171,12 +171,13 @@ class Pipeliner:
       edgeType = edgeInfo["type"]
 
       teeArgs = []
+      logName = f"{self.logsDir}/l_{edge[0].label}-{edge[1].label}-{edgeInfo['name']}"
       if edgeType == "binary": # No timestamps
-        teeArgs.append(f"{self.logsDir}/{edgeInfo['name']}.data ") 
+        teeArgs.append(f"{logName}.data ") 
       elif edgeType == "text": # Timestamp each line
-        teeArgs.append(f">(ts '[%Y-%m-%d %H:%M:%S]' > {self.logsDir}/{edgeInfo['name']}.log)") 
+        teeArgs.append(f">(ts '[%Y-%m-%d %H:%M:%S]' > {logName}.log)") 
       elif edgeType == "none":
-        teeArgs.append(f"{self.logsDir}/{edgeInfo['name']}.log")
+        teeArgs.append(f"{logName}.log")
       if METRICS:
         teeArgs.append(f">(python3 ./metrics.py {edgeName})")
       if len(teeArgs) > 0:
