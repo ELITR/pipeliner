@@ -101,6 +101,11 @@ class Pipeliner:
           inputName = next((x for x in node.ingress.keys() if outputType in node.ingress[x]))
           node.ingress[inputName] = [proxyInputPort]
           proxies.append(f"{self._netcatListen(proxyInputPort)} | {self._netcat(outputType)} | {self._splitOutputs(proxyOutputPorts)}")
+        # Split the output; stdout is handled in _executeLocalResources
+        elif count > 1 and outputType != "stdout":
+          proxyOutputPorts = [self.availablePorts.pop() for x in range(count)]
+          node.egress[outputName] = proxyOutputPorts
+          proxies.append(f"{self._netcatListen(outputType)} | {self._splitOutputs(proxyOutputPorts)}")
 
     return proxies
 
