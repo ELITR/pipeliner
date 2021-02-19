@@ -218,7 +218,7 @@ mkdir -p {self.logsDir}
     print(f"cp $0 {self.logsDir}") # make a copy of the script
     print(f"( echo Last started pipeline was: > INFO ; echo Container: $(hostname) >> INFO; echo Logdir: {self.logsDir} >> INFO )")
     print(f"echo Container $(hostname) is starting, follow logs: {self.logsDir} >&2")
-    print(f"if [ ""$1"" == '--silent' ]; then tail -f /dev/null; else tail -F -n {componentCount} {self.logsDir}/*.err; fi")
+    print(f"if [ \"$1\" == '--silent' ]; then tail -f /dev/null; else tail -F -n {componentCount} {self.logsDir}/*.err; fi")
     
   def draw(self):
     plt.subplot()
