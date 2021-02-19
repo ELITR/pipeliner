@@ -190,13 +190,14 @@ class Pipeliner:
 
   # Catch SIGINT and properly terminate all children.
   def _prologue(self):
-    print("""handler()
+    print("""#!/bin/bash
+handler()
   {
       pkill -TERM -P $$
   }
 trap handler SIGINT
     """)
-    print(f"""DATE=$(date '+%Y-%m-%d-%H:%M:%S')
+    print(f"""DATE=$(date '+%Y%m%d-%H%M%S')
 mkdir -p {self.logsDir}
       """)
 
@@ -211,10 +212,15 @@ mkdir -p {self.logsDir}
     commands += self._createPipes()
 
     componentCount = len(self.graph.nodes)
-    commands += [f"tail -F -n {componentCount} {self.logsDir}/*.err"]
+    #commands += [f"( echo Last started pipeline was: > INFO ; echo Container: $(hostname) >> INFO; echo Logdir: {self.logsDir} >> INFO )"]
+    #commands += [f"tail -F -n {componentCount} {self.logsDir}/*.err"]
     self._prologue()
     self._reportEntrypoints()
-    print(" &\n".join(commands))
+    print(" &\n".join(commands)  + " &")
+    print(f"cp $0 {self.logsDir}") # make a copy of the script
+    print(f"( echo Last started pipeline was: > INFO ; echo Container: $(hostname) >> INFO; echo Logdir: {self.logsDir} >> INFO )")
+    print(f"echo Container $(hostname) is starting, follow logs: {self.logsDir} >&2")
+    print(f"if [ \"$1\" == '--silent' ]; then tail -f /dev/null; else tail -F -n {componentCount} {self.logsDir}/*.err; fi")
     
   def draw(self):
     plt.subplot()

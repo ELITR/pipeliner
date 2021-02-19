@@ -21,12 +21,19 @@ Concatenated output is written to the STDOUT
 import argparse
 import glob
 import sys
+import os
 import socket
 import threading
 import queue
 import time
 import select
 import logging
+import pathlib
+
+# print to stderr
+def eprint(*args, **kwargs):
+    print(*args, file=sys.stderr, **kwargs)
+
 
 class Socket(threading.Thread):
     def __init__(self, preview, port):
@@ -170,6 +177,27 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--interval', default=0.5, type=int)
     parser.add_argument('--debug', default=False, action='store_true')
-
+    parser.add_argument('--clobber', default=False, action='store_true')
+    parser.add_argument('vars', nargs='*')
     args = parser.parse_args()
+
+    if len(args.vars) > 0:
+        # we should create the directory ourselves
+        # usage: dirname port1 port2 port3 ...
+        dirname=args.vars[0]
+        ports=args.vars[1:]
+        eprint("Dirname ", dirname)
+        eprint("Ports ", ports)
+        pathlib.Path(dirname).mkdir(parents=True, exist_ok=args.clobber)
+          # create the directory and deep it ok if exists with --clobber
+        os.chdir(dirname)
+        for port in ports:
+            f = open(port+".in", "w")
+            f.write(port+"\n")
+            f.close()
+        # Now indicate that the first port is the one to be selected
+        f = open("SELECT", "w")
+        f.write(ports[0]+"\n")
+        f.close()
+
     main(args)
