@@ -23,6 +23,7 @@ class Pipeliner:
     # List of ports that are guaranteed to be available on the machine
     self.availablePorts = availablePorts
     self._unbuffered = "stdbuf -oL "
+    self._timestampFormat = "[%Y-%m-%d %H:%M:%S]"
     self._label = ""
 
   class Node:
@@ -125,7 +126,8 @@ class Pipeliner:
       # Don't buffer the componen'ts output.
       command += self._unbuffered + node.code
 
-      command += f" 2>{self.logsDir}/{node.label}-{node.name}.err"
+      # Redirect stderr to a subshell to add timestamps
+      command += f" 2> >(ts '{self._timestampFormat}' > {self.logsDir}/{node.label}-{node.name}.err)"
 
       edgesFromStdout = [edge for edge in self.graph.out_edges(node, data=True) if edge[2]["info"]["from"] == node.stdoutName]
       if len(edgesFromStdout) > 0:
@@ -175,7 +177,7 @@ class Pipeliner:
       if edgeType == "binary": # No timestamps
         teeArgs.append(f"{logName}.data ") 
       elif edgeType == "text": # Timestamp each line
-        teeArgs.append(f">(ts '[%Y-%m-%d %H:%M:%S]' > {logName}.log)") 
+        teeArgs.append(f">(ts '{self._timestampFormat}' > {logName}.log)") 
       elif edgeType == "none":
         teeArgs.append(f"{logName}.log")
       if METRICS:
