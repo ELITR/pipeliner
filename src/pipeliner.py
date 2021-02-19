@@ -209,7 +209,11 @@ mkdir -p {self.logsDir}
     commands += self._createPipes()
 
     componentCount = len(self.graph.nodes)
-    commands += [f"tail -F -n {componentCount} {self.logsDir}/*.err"]
+    commands += [f"echo '#' Container $(hostname) is running the pipeline. Kill container with ctrl-D."]
+    commands += [f"echo '#' Logs are in: {self.logsDir}"]
+    commands += [f"echo '#' Watch them using:"]
+    commands += [f"echo '  ' tail -F -n {componentCount} {self.logsDir}/'*'.err"]
+    commands += [f"echo '  ' tail -F -n {componentCount} {self.logsDir}/'*'.err"]
     self._prologue()
     self._reportEntrypoints()
     print(" &\n".join(commands))
