@@ -37,12 +37,21 @@ class Pipeliner:
       self.stdoutName = next((k for k,v in egress.items() if v == "stdout"), None)
 
   class LocalNode(Node):
-    def __init__(self, name, ingress, egress, code=None):
+    def __init__(self, outer_self, name, ingress, egress, code=None, do_format=False):
       super().__init__(name, ingress, egress)
-      self.code = code
+      if do_format:
+          # the code contains {...} variables, emulate f-string evaluation
+          # on it
+          # following https://stackoverflow.com/questions/55457543/trigger-f-string-parse-on-python-string-in-variable
+          # (I picked the simple and less controllable solution)
+          self.code = eval(f'f{code!r}', outer_self.__dict__)
+      else:
+          # the code is finished, do not reinterpret it
+          self.code = code
 
-  def addLocalNode(self, name, ingress, egress, code):
-    return self.LocalNode(name, ingress, egress, code)
+  def addLocalNode(self, name, ingress, egress, code, do_format=False):
+    return self.LocalNode(self, name, ingress, egress, code, do_format)
+      # we pass self to the constructor of LocalNode to allow do_format
 
   def addEdge(self, source, sourceOutput, target, targetInput, type="text"):
     if sourceOutput not in source.egress.keys():
