@@ -6,7 +6,7 @@ from collections import Counter
 from datetime import datetime
 
 # Used for transferring data between stdout and stdins
-AVAILABLE_PORTS = list(range(9000, 9900))
+AVAILABLE_PORTS = list(range(9000, 9999))
 
 # Enable TICK-stack based metrics of all pipes
 METRICS = False
@@ -15,7 +15,7 @@ METRICS = False
 flatten = lambda t: [item for sublist in t for item in sublist]
 
 class Pipeliner:
-  def __init__(self, logsDir="/dev/null", availablePorts=list(range(9100,9200))):
+  def __init__(self, logsDir="/dev/null", availablePorts=AVAILABLE_PORTS):
     self.graph = nx.MultiDiGraph()
     self.resources = {}
     self.logsDir = logsDir if logsDir == "/dev/null" else logsDir + "/$DATE"
