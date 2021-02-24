@@ -166,7 +166,7 @@ class Pipeliner:
   # Labels the nodes so their logs are roughly in the same order as the dataflow
   def _labelNodes(self):
     counter = 0
-    for node in nx.dfs_preorder_nodes(self.graph):
+    for node in nx.topological_sort(self.graph):
       node.label = str(counter).zfill(2)
       counter += 1
 
