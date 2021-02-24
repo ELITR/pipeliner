@@ -4,6 +4,7 @@
 import sys
 import math
 import socket
+import time
 
 import sys
 def eprint(*args, **kwargs):
@@ -26,7 +27,22 @@ assert len(langs) == len(ports), f"Mismatched lengths of langs and ports: {len(l
 for lang, port in zip(langs, ports):
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-    s.connect(("127.0.0.1", port))
+    # resilient connect
+    attempt = 0
+    reported = 1
+    while True:
+        attempt += 1
+        try:
+            s.connect(("127.0.0.1", port))
+        except ConnectionRefusedError:
+            if attempt > reported:
+                eprint(f"Struggling to connect {lang} to port {port}, attempt {attempt}.")
+                reported *= 2
+            time.sleep(0.2)
+        else:
+            break
+    # s.connect(("127.0.0.1", port))
+    eprint(f"Connected sink for {lang} to port {port}: {s}")
     sockets[lang] = s
 
 for line in sys.stdin:
