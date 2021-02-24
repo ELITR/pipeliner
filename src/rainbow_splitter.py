@@ -43,4 +43,8 @@ for line in sys.stdin:
     for lang, sentence in pairs:
         if lang in langs:
             print(sentence)
-            sockets[lang].send(f"{timestamp} {sentence}\n".encode())
+            try:
+                sockets[lang].send(f"{timestamp} {sentence}\n".encode())
+            except BrokenPipeError:
+                eprint(f"Failed to send sentences to {lang}, port {sockets[lang].getnameinfo()[1]}")
+
