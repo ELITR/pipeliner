@@ -56,7 +56,8 @@ for line in sys.stdin:
       # strip the timestamp from the first column
     gotlangs = packets[0::2]
     gotlangsset = " ".join(sorted(gotlangs))
-    assert langsset == gotlangsset, f"Mismatched set of languages:\nEXP: {langsset}\nGOT: {gotlangsset}"
+    if langsset != gotlangsset:
+        eprint(f"WARNING: Mismatched set of languages:\nEXP: {langsset}\nGOT: {gotlangsset}")
     pairs = zip(gotlangs, packets[1::2])
     for lang, sentence in pairs:
         if lang in langs:
