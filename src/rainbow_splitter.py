@@ -24,7 +24,9 @@ langsset = " ".join(sorted(langs))
 
 assert len(langs) == len(ports), f"Mismatched lengths of langs and ports: {len(langs)} vs {len(ports)}"
 
+lang2port = {}
 for lang, port in zip(langs, ports):
+    lang2port[lang] = port
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
     # resilient connect
@@ -42,7 +44,7 @@ for lang, port in zip(langs, ports):
         else:
             break
     # s.connect(("127.0.0.1", port))
-    eprint(f"Connected sink for {lang} to port {port}: {s}")
+    eprint(f"Connected sink for '{lang}' to port {port}: {s}")
     sockets[lang] = s
 
 for line in sys.stdin:
@@ -62,5 +64,5 @@ for line in sys.stdin:
             try:
                 sockets[lang].send(f"{timestamp} {sentence}\n".encode())
             except BrokenPipeError:
-                eprint(f"Failed to send sentences to {lang}, port {sockets[lang].getnameinfo()[1]}")
+                eprint(f"Failed to send sentences to {lang}, port {lang2port[lang]}")
 
