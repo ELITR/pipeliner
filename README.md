@@ -133,4 +133,4 @@ There's a `docker-compose.yaml` file included in the repo intended for developme
 - kill all workers on exit
 
 # TODO (code)
-- nodes import+exporting
+- nodes import+exporting.
