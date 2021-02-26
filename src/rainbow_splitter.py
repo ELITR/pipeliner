@@ -58,7 +58,7 @@ for line in sys.stdin:
     gotlangsset = " ".join(sorted(gotlangs))
     if langsset != gotlangsset:
         eprint(f"WARNING: Mismatched set of languages:\nEXP: {langsset}\nGOT: {gotlangsset}")
-	continue
+        continue
     pairs = zip(gotlangs, packets[1::2])
     for lang, sentence in pairs:
         if lang in langs:
@@ -67,4 +67,3 @@ for line in sys.stdin:
                 sockets[lang].send(f"{timestamp} {sentence}\n".encode())
             except BrokenPipeError:
                 eprint(f"Failed to send sentences to {lang}, port {lang2port[lang]}")
-
