@@ -1,7 +1,11 @@
 #!/usr/bin/python3
 import networkx as nx
-from functools import reduce
+import psutil
+import socket
+import os
+import time
 import matplotlib.pyplot as plt
+from functools import reduce
 from collections import Counter
 from datetime import datetime
 
@@ -25,6 +29,7 @@ class Pipeliner:
     self._unbuffered = "stdbuf -oL "
     self._timestampFormat = "[%Y-%m-%d %H:%M:%S]"
     self._label = ""
+    self._monitoringPorts = {}
 
   class Node:
     def __init__(self, name, ingress, egress):
@@ -126,13 +131,13 @@ class Pipeliner:
     commands = []
     for node in [n for n in nx.topological_sort(self.graph) if isinstance(n, self.LocalNode)]:
       command = ""
-      
+
+      # Set up a proxy port and feed it to stdin
       if node.stdinName:
         stdinPort = self.availablePorts.pop()
         node.ingress[node.stdinName] = [stdinPort]
         command += f"{self._netcatListen(stdinPort)} | "
-
-      # Don't buffer the componen'ts output.
+      # Don't buffer the component's output
       command += self._unbuffered + node.code
 
       # Redirect stderr to a subshell to add timestamps
@@ -170,6 +175,47 @@ class Pipeliner:
       node.label = str(counter).zfill(2)
       counter += 1
 
+  def _getMonitoringPorts(self):
+    for node in self.graph.nodes:
+      ports = []
+      for ingress_ports in node.ingress.values():
+        ports += ingress_ports
+      for egress_ports in node.egress.values():
+        ports += egress_ports
+      self._monitoringPorts[node.name] = ports
+
+  # TODO: Not working properly!
+  def _bashmonitor(self):
+    print("""
+declare -A ports
+red=`tput setaf 1`
+green=`tput setaf 2`
+reset=`tput sgr0`
+    """)
+    nodeNames = [f'"{node}"' for node in self._monitoringPorts.keys()]
+    print(f"nodeNames=({' '.join(nodeNames)})")
+    for node, usedPorts in self._monitoringPorts.items():
+      usedPorts = [str(port) for port in usedPorts]
+      print(f"ports[{node}]=\"{' '.join(usedPorts)}\"")
+
+    print("""
+while true; do
+  clear
+  for name in "${nodeNames[@]}"; do
+    echo $name
+    p="${ports[$name]}"
+    for port in $p; do
+      if nc -z -w 1 localhost $port; then
+        echo "  $port ${green}RUNNING${reset}"
+      else 
+        echo "  $port ${red}FREE${reset}"
+      fi 
+    done
+  done
+  sleep 1
+done
+""")
+
 
   # Create pipes between the components, as specified by the edges of the graph.
   def _createPipes(self):
@@ -199,38 +245,34 @@ class Pipeliner:
 
   # Catch SIGINT and properly terminate all children.
   def _prologue(self):
-    print("""#!/bin/bash
-handler()
-  {
-      pkill -TERM -P $$
-  }
-trap handler SIGINT
-    """)
     print(f"""DATE=$(date '+%Y%m%d-%H%M%S')
 mkdir -p {self.logsDir}
       """)
 
   # Generate a bash pipeline for connecting all of the components
-  def createPipeline(self):
+  def createPipeline(self, test=False):
 
     self._sanityCheck()
     self._labelNodes()
     commands = []
     commands += self._createProxies()
     commands += self._executeLocalResources()
+    self._getMonitoringPorts()
     commands += self._createPipes()
 
     componentCount = len(self.graph.nodes)
-    #commands += [f"( echo Last started pipeline was: > INFO ; echo Container: $(hostname) >> INFO; echo Logdir: {self.logsDir} >> INFO )"]
-    #commands += [f"tail -F -n {componentCount} {self.logsDir}/*.err"]
     self._prologue()
     self._reportEntrypoints()
+
     print(" &\n".join(commands)  + " &")
     print(f"cp $0 {self.logsDir}") # make a copy of the script
     print(f"( echo Last started pipeline was: > INFO ; echo Container: $(hostname) >> INFO; echo Logdir: {self.logsDir} >> INFO )")
     print(f"echo Container $(hostname) is starting, follow logs: {self.logsDir} >&2")
-    print(f"if [ \"$1\" == '--silent' ]; then tail -f /dev/null; else tail -F -n {componentCount} {self.logsDir}/*.err; fi")
-    
+    if test:
+      self._bashmonitor()
+    else:
+      print(f"if [ \"$1\" == '--silent' ]; then tail -f /dev/null; else tail -F -n {componentCount} {self.logsDir}/*.err; fi")
+   
   def draw(self):
     plt.subplot()
     pos = nx.spring_layout(self.graph)
