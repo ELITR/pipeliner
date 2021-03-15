@@ -4,6 +4,7 @@ import psutil
 import socket
 import os
 import time
+import copy
 import matplotlib.pyplot as plt
 from functools import reduce
 from collections import Counter
@@ -30,6 +31,7 @@ class Pipeliner:
     self._timestampFormat = "[%Y-%m-%d %H:%M:%S]"
     self._label = ""
     self._monitoringPorts = {}
+    self._components = []
 
   class Node:
     def __init__(self, name, ingress, egress):
@@ -40,7 +42,14 @@ class Pipeliner:
       self.stdinName = next((k for k,v in ingress.items() if v == "stdin"), None)
       self.egress = {key: [val] for key, val in egress.items()}
       self.stdoutName = next((k for k,v in egress.items() if v == "stdout"), None)
-
+  class Component:
+    def __init__(self, name, sourceNode, targetNode, targetOutput, fileName, type):
+      self.name = name
+      self.sourceNode = sourceNode
+      self.targetNode = targetNode
+      self.targetOutput = targetOutput
+      self.fileName = fileName
+      self.type = type
   class LocalNode(Node):
     def __init__(self, outer_self, name, ingress, egress, code=None, do_format=False):
       super().__init__(name, ingress, egress)
@@ -82,10 +91,26 @@ class Pipeliner:
     sourceOutput = list(source.egress.keys())[0]
     targetInput = list(target.ingress.keys())[0]
     self.addEdge(source, sourceOutput, target, targetInput, type=type)
+  
+  def addComponent(self, name, sourceNode, targetNode, targetOutput, indexFile, type):
+    if type not in ["asr", "mt", "smt"]:
+      raise Exception(f"Component {name} has unsupported type: {type}")
+    extensions = []
+    if type == "asr" or type == "smt":
+      extensions = ["mp3", "mkv"]
+    else:
+      extensions = ["OSt"]
+
+    with open(indexFile) as index:
+      fileNames = index.readlines()
+      for fileName in fileNames:
+        fileName = fileName.strip()
+        if fileName.endswith(tuple(extensions)):
+          self._components.append(self.Component(name, sourceNode, targetNode, targetOutput, fileName, type))
 
   # Wait for the port to open, before actually connecting to it.
   def _netcat(self, port):
-    return f"(while ! nc -z localhost {port}; do sleep 1; done; nc localhost {port})"
+    return f"(while ! ss -lt | grep -q 127.0.0.1:{port}; do sleep 1; done; nc localhost {port})"
 
   # Without the -k flag, nc will exit after being probed by another nc with -z flag.
   def _netcatListen(self, port):
@@ -184,7 +209,6 @@ class Pipeliner:
         ports += egress_ports
       self._monitoringPorts[node.name] = ports
 
-  # TODO: Not working properly!
   def _bashmonitor(self):
     print("""
 declare -A ports
@@ -205,7 +229,7 @@ while true; do
     echo $name
     p="${ports[$name]}"
     for port in $p; do
-      if nc -z -w 1 localhost $port; then
+      if ss -lt | grep -q 127.0.0.1:$port; then
         echo "  $port ${green}RUNNING${reset}"
       else 
         echo "  $port ${red}FREE${reset}"
@@ -237,15 +261,21 @@ done
         teeArgs.append(f"{logName}.log")
       if METRICS:
         teeArgs.append(f">(python3 ./metrics.py {edgeName})")
+
+      portFrom = edge[0].egress[edgeFrom].pop()
+      portTo = edge[1].ingress[edgeTo].pop()
       if len(teeArgs) > 0:
-        pipes.append(f"{self._netcatListen(edge[0].egress[edgeFrom].pop())} | tee {' '.join(teeArgs)} | {self._netcat(edge[1].ingress[edgeTo].pop())}")
+        pipes.append(f"{self._netcatListen(portFrom)} | tee {' '.join(teeArgs)} | {self._netcat(portTo)}")
       else:
-        pipes.append(f"{self._netcatListen(edge[0].egress[edgeFrom].pop())} | {self._netcat(edge[1].ingress[edgeTo].pop())}")
+        pipes.append(f"{self._netcatListen(portFrom)} | {self._netcat(portTo)}")
+
     return pipes
 
   # Catch SIGINT and properly terminate all children.
   def _prologue(self):
-    print(f"""DATE=$(date '+%Y%m%d-%H%M%S')
+    print(f"""
+trap "trap - SIGTERM && kill -- -$$" SIGINT SIGTERM EXIT
+DATE=$(date '+%Y%m%d-%H%M%S')
 mkdir -p {self.logsDir}
       """)
 
@@ -272,7 +302,16 @@ mkdir -p {self.logsDir}
       self._bashmonitor()
     else:
       print(f"if [ \"$1\" == '--silent' ]; then tail -f /dev/null; else tail -F -n {componentCount} {self.logsDir}/*.err; fi")
-   
+
+  def createEvaluations(self, directory):
+    for component in self._components:
+      pipeline = copy.deepcopy(self)
+      pipeline.graph = self.graph.subgraph([component.sourceNode, component.targetNode])
+      pipeline.createPipeline()
+      print("--------")
+
+      
+
   def draw(self):
     plt.subplot()
     pos = nx.spring_layout(self.graph)
