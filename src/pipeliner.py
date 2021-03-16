@@ -316,10 +316,20 @@ class Pipeliner:
 
   def createEvaluations(self, directory):
     for component in self._components:
-      pipeline = copy.deepcopy(self)
-      pipeline.graph = self.graph.subgraph([component.sourceNode, component.targetNode])
-      pipeline.createPipeline()
-      print("--------")
+      entryNode = self.addLocalNode(f"fileInputNode-{component.fileName}", {}, {"fileOutput": "stdout"}, f"cat {component.fileName}")
+      self.graph.add_edge(entryNode, component.sourceNode, info={
+        "from": "fileOutput",
+        "to": component.sourceInput,
+        "name": f"fileOutput2{component.sourceInput}",
+        "type": "text"
+      })
+      path = nx.algorithms.shortest_path(self.graph, entryNode, component.targetNode)
+      evaluationPath = f"{directory}/{component.name}"
+      os.makedirs(evaluationPath, exist_ok=True)
+      pipeline = Pipeline(copy.deepcopy(self.graph.subgraph(path)), evaluationPath)
+      commands = pipeline.createPipeline()
+      with open(f"{evaluationPath}/pipeline.sh", "w+") as pipeline:
+        pipeline.writelines(commands)
       
   def createPipeline(self, test=False):
     pipeline = Pipeline(copy.deepcopy(self.graph), self.logsDir)
