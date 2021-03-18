@@ -29,7 +29,7 @@ class Pipeline:
   
   # Wait for the port to open, before actually connecting to it.
   def _netcat(self, port):
-    return f"(while ! ss -lt | grep -q 127.0.0.1:{port}; do sleep 1; done; nc localhost {port})"
+    return f"(while ! ss -lt | grep -q 127.0.0.1:{port}; do sleep 1; done; nc -q 1 localhost {port})"
 
   # Without the -k flag, nc will exit after being probed by another nc with -z flag.
   def _netcatListen(self, port):
@@ -195,15 +195,16 @@ done
 
   # Catch SIGINT and properly terminate all children.
   def _prologue(self):
-    prologue = []
-    prologue.append(f"""
-trap "trap - SIGTERM && kill -- -$$" SIGINT SIGTERM EXIT
-DATE=$(date '+%Y%m%d-%H%M%S')
-mkdir -p {self.logsDir}""")
-    return prologue
+    return [
+      """trap "trap - SIGTERM && kill -- -$$" SIGINT SIGTERM EXIT""",
+      """DATE=$(date '+%Y%m%d-%H%M%S')""",
+      f"mkdir -p {self.logsDir}"""
+    ]
 
   # Generate a bash pipeline for connecting all of the components
-  def createPipeline(self, test=False):
+  def createPipeline(self, mode="tail"):
+    if mode not in ["tail", "test", "evaluation"]:
+      raise Exception(f"Unsupported pipeline mode: ${mode}")
 
     self._sanityCheck()
     self._labelNodes()
@@ -314,24 +315,33 @@ class Pipeliner:
           self._components.append(self.Component(name, sourceNode, sourceInput, targetNode, targetOutput, fileName, type))
 
 
-  def createEvaluations(self, directory):
+  def createEvaluations(self, hostDirectory, containerDirectory, testsetDirectory):
     for component in self._components:
-      entryNode = self.addLocalNode(f"fileInputNode-{component.fileName}", {}, {"fileOutput": "stdout"}, f"cat {component.fileName}")
+      entryNode = self.addLocalNode(f"fileInputNode-{component.fileName}", {}, {"fileOutput": "stdout"}, f"cat {testsetDirectory}/{component.fileName}")
       self.graph.add_edge(entryNode, component.sourceNode, info={
         "from": "fileOutput",
         "to": component.sourceInput,
         "name": f"fileOutput2{component.sourceInput}",
         "type": "text"
       })
-      path = nx.algorithms.shortest_path(self.graph, entryNode, component.targetNode)
-      evaluationPath = f"{directory}/{component.name}"
-      os.makedirs(evaluationPath, exist_ok=True)
-      pipeline = Pipeline(copy.deepcopy(self.graph.subgraph(path)), evaluationPath)
+      exitNode = self.addLocalNode(f"exitNode-{component.fileName}", {"output": "stdin"}, {}, f"cat > ./RESULT")
+      self.graph.add_edge(component.targetNode, exitNode, info={
+        "from": component.targetOutput,
+        "to": "output",
+        "name": f"{component.targetOutput}2RESULT",
+        "type": "text"
+      })
+      path = nx.algorithms.shortest_path(self.graph, entryNode, exitNode)
+      hostEvaluationPath = f"{hostDirectory}/{component.name}/{component.fileName}"
+      containerEvaluationPath = f"{containerDirectory}/{component.name}/{component.fileName}"
+
+      os.makedirs(hostEvaluationPath, exist_ok=True)
+      pipeline = Pipeline(copy.deepcopy(self.graph.subgraph(path)), containerEvaluationPath)
       commands = pipeline.createPipeline()
-      with open(f"{evaluationPath}/pipeline.sh", "w+") as pipeline:
-        pipeline.writelines(commands)
+      with open(f"{hostEvaluationPath}/pipeline.sh", "w+") as pipeline:
+        pipeline.writelines([c + "\n" for c in commands])
       
-  def createPipeline(self, test=False):
+  def createPipeline(self, mode):
     pipeline = Pipeline(copy.deepcopy(self.graph), self.logsDir)
     commands = pipeline.createPipeline()
     for command in commands:
