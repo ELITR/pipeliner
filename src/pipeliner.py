@@ -203,7 +203,7 @@ done
 
   # Generate a bash pipeline for connecting all of the components
   def createPipeline(self, mode="tail"):
-    if mode not in ["tail", "test", "evaluation"]:
+    if mode not in ["tail", "monitor", None]:
       raise Exception(f"Unsupported pipeline mode: ${mode}")
 
     self._sanityCheck()
@@ -221,9 +221,9 @@ done
     allCommands.append(f"cp $0 {self.logsDir}") # make a copy of the script
     allCommands.append(f"( echo Last started pipeline was: > INFO ; echo Container: $(hostname) >> INFO; echo Logdir: {self.logsDir} >> INFO )")
     allCommands.append(f"echo Container $(hostname) is starting, follow logs: {self.logsDir} >&2")
-    if test:
+    if mode == "monitor":
       allCommands += self._bashmonitor()
-    else:
+    elif mode == "tail":
       componentCount = len(self.graph.nodes)
       allCommands.append(f"if [ \"$1\" == '--silent' ]; then tail -f /dev/null; else tail -F -n {componentCount} {self.logsDir}/*.err; fi")
     return allCommands
@@ -337,7 +337,19 @@ class Pipeliner:
 
       os.makedirs(hostEvaluationPath, exist_ok=True)
       pipeline = Pipeline(copy.deepcopy(self.graph.subgraph(path)), containerEvaluationPath)
-      commands = pipeline.createPipeline()
+      commands = pipeline.createPipeline(mode=None)
+      commands.append("""
+while :; do
+  lastModificationSeconds=$(date +%s -r RESULT)
+  currentSeconds=$(date +%s)
+  elapsedSeconds=$((currentSeconds - lastModificationSeconds))
+  if (( elapsedSeconds > 30 )); then
+    echo "30 seconds from last write to the result file, shutting down in 30 seconds..."
+    sleep 30
+    kill -SIGINT $$
+  fi
+done
+      """)
       with open(f"{hostEvaluationPath}/pipeline.sh", "w+") as pipeline:
         pipeline.writelines([c + "\n" for c in commands])
       
