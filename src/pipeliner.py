@@ -5,6 +5,8 @@ import socket
 import os
 import time
 import copy
+import subprocess
+import shutil
 import matplotlib.pyplot as plt
 from functools import reduce
 from collections import Counter
@@ -248,13 +250,13 @@ class Pipeliner:
       self.egress = {key: [val] for key, val in egress.items()}
       self.stdoutName = next((k for k,v in egress.items() if v == "stdout"), None)
   class Component:
-    def __init__(self, name, sourceNode, sourceInput, targetNode, targetOutput, fileName, type):
+    def __init__(self, name, sourceNode, sourceInput, targetNode, targetOutput, indexFile, type):
       self.name = name
       self.sourceNode = sourceNode
       self.sourceInput = sourceInput
       self.targetNode = targetNode
       self.targetOutput = targetOutput
-      self.fileName = fileName
+      self.indexFile = indexFile
       self.type = type
   class LocalNode(Node):
     def __init__(self, outer_self, name, ingress, egress, code=None, do_format=False):
@@ -301,44 +303,45 @@ class Pipeliner:
   def addComponent(self, name, sourceNode, sourceInput, targetNode, targetOutput, indexFile, type):
     if type not in ["asr", "mt", "smt"]:
       raise Exception(f"Component {name} has unsupported type: {type}")
-    extensions = []
-    if type == "asr" or type == "smt":
-      extensions = ["mp3", "mkv"]
-    else:
-      extensions = ["OSt"]
-
-    with open(indexFile) as index:
-      fileNames = index.readlines()
-      for fileName in fileNames:
-        fileName = fileName.strip()
-        if fileName.endswith(tuple(extensions)):
-          self._components.append(self.Component(name, sourceNode, sourceInput, targetNode, targetOutput, fileName, type))
+    self._components.append(self.Component(name, sourceNode, sourceInput, targetNode, targetOutput, indexFile, type))
 
 
   def createEvaluations(self, hostDirectory, containerDirectory, testsetDirectory):
     for component in self._components:
-      entryNode = self.addLocalNode(f"fileInputNode-{component.fileName}", {}, {"fileOutput": "stdout"}, f"cat {testsetDirectory}/{component.fileName}")
-      self.graph.add_edge(entryNode, component.sourceNode, info={
-        "from": "fileOutput",
-        "to": component.sourceInput,
-        "name": f"fileOutput2{component.sourceInput}",
-        "type": "text"
-      })
-      exitNode = self.addLocalNode(f"exitNode-{component.fileName}", {"output": "stdin"}, {}, f"cat > ./RESULT")
-      self.graph.add_edge(component.targetNode, exitNode, info={
-        "from": component.targetOutput,
-        "to": "output",
-        "name": f"{component.targetOutput}2RESULT",
-        "type": "text"
-      })
-      path = nx.algorithms.shortest_path(self.graph, entryNode, exitNode)
-      hostEvaluationPath = f"{hostDirectory}/{component.name}/{component.fileName}"
-      containerEvaluationPath = f"{containerDirectory}/{component.name}/{component.fileName}"
+      evaluationFiles = subprocess.run(["SLTIndexParser", component.indexFile, testsetDirectory], stdout=subprocess.PIPE).stdout.decode()
+      if len(evaluationFiles) < 1:
+        raise Exception(f"Index {component.indexFile} has no files to evaluate")
+      pairs = [pair.split("\t") for pair in evaluationFiles.rstrip().split("\n")]
+      for pair in pairs:
+        source, reference = pair
+        sourceFileName = os.path.basename(source)
 
-      os.makedirs(hostEvaluationPath, exist_ok=True)
-      pipeline = Pipeline(copy.deepcopy(self.graph.subgraph(path)), containerEvaluationPath)
-      commands = pipeline.createPipeline(mode=None)
-      commands.append("""
+        hostEvaluationPath = f"{hostDirectory}/{component.name}/{sourceFileName}"
+        os.makedirs(hostEvaluationPath, exist_ok=True)
+        shutil.copy(source, f"{hostEvaluationPath}/SOURCE")
+        shutil.copy(reference, f"{hostEvaluationPath}/REFERENCE")
+
+        containerEvaluationPath = f"{containerDirectory}/{component.name}/{sourceFileName}"
+      
+        entryNode = self.addLocalNode(f"fileInputNode-{sourceFileName}", {}, {"fileOutput": "stdout"}, f"cat ./SOURCE")
+        self.graph.add_edge(entryNode, component.sourceNode, info={
+          "from": "fileOutput",
+          "to": component.sourceInput,
+          "name": f"fileOutput2{component.sourceInput}",
+          "type": "text"
+        })
+        exitNode = self.addLocalNode(f"exitNode-{sourceFileName}", {"output": "stdin"}, {}, f"cat > ./RESULT")
+        self.graph.add_edge(component.targetNode, exitNode, info={
+          "from": component.targetOutput,
+          "to": "output",
+          "name": f"{component.targetOutput}2RESULT",
+          "type": "text"
+        })
+        path = nx.algorithms.shortest_path(self.graph, entryNode, exitNode)
+
+        pipeline = Pipeline(copy.deepcopy(self.graph.subgraph(path)), containerEvaluationPath)
+        commands = pipeline.createPipeline(mode=None)
+        commands.append("""
 while :; do
   lastModificationSeconds=$(date +%s -r RESULT)
   currentSeconds=$(date +%s)
@@ -349,9 +352,9 @@ while :; do
     kill -SIGINT $$
   fi
 done
-      """)
-      with open(f"{hostEvaluationPath}/pipeline.sh", "w+") as pipeline:
-        pipeline.writelines([c + "\n" for c in commands])
+        """)
+        with open(f"{hostEvaluationPath}/pipeline.sh", "w+") as pipeline:
+          pipeline.writelines([c + "\n" for c in commands])
       
   def createPipeline(self, mode):
     pipeline = Pipeline(copy.deepcopy(self.graph), self.logsDir)
