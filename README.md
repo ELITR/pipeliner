@@ -5,6 +5,7 @@ This repository contains tools to create and execute a *pipeline* -- various com
 - Python 3
 - networkx 
 - (optional, for visualization) matplotlib
+- SLTev installed (when using component evaluation)
 
 `pip install -r requirements.txt`
 
@@ -124,6 +125,28 @@ audioRecording = p.addLocalNode("audioRecording", {}, {"audiorecord": "stdout"},
 ```
 and then from the host machine, run `arecord -f S16_LE -c1 -r 16000 -t raw -D default | nc localhost 5000`, which transmits the audio to the container. One upside of this port-based approach is you can start and stop the `arecord` without bringing the whole pipeline down. 
 
+# Evaluation
+Pipeliner supports evaluation of parts of the pipeline using SLTev. A part of a pipeline that is evaluated is called a `component`. First, specify the components you want to evaluate. Provide the start node (the one consuming the input) and the end node (the one outputting the results to be evaluated), along with the input and output names. Specify the path to the index file, and the type of the component (`slt, mt, asr`). The type determines how the resulting files are going to be evaluated with SLTev.
+
+```python
+p.addComponent(componentName, startNode, inputName, endNode, outputName, indexFile, type)
+```
+
+Once all components are added, the following command will prepare the files for evaluation. 
+
+```python
+p.createEvaluations(hostDirectory, containerDirectory, testsetDirectory)
+```
+
+- `hostDirectory` is the folder on the host where the directories for evaluation purposes are going to be generated. Each component will get it's folder and each file in the corresponding index file will also get it's folder.
+- `containerDirectory` is where the hostDirectory is bind-mounted to the container.
+- `testsetDirectory` is the base location of the path the index file refers to. For example, SLTEv index files look like this: `elitr-testset/documents/wmt18-newstest-sample-read`. `testsetDirectory` would then be a folder containing the `elitr-testset` folder on the host.
+
+Each final folder (of a file of a component) will contain `SRC`, `REF` and `pipeline.sh` files, and possibly some other files used for the evaluation. The `pipeline.sh` is a pipeline that stores the results of processing the `SRC` file  to a `RES` file.
+
+## Pipeline termination
+Currently, the pipeline watches the `RES` file and when it hasn't been modified for 30 seconds, it waits for another 30 seconds and then terminates the pipeline. This mechanism is not final and it's certainly possible the numbers are wrong.
+
 # Development
 There's a `docker-compose.yaml` file included in the repo intended for developmental work. It's main use is to bind-mount the Python scripts to the cruise-control image, so the compiled tools are available for debugging when developing.
 
@@ -131,6 +154,7 @@ There's a `docker-compose.yaml` file included in the repo intended for developme
 - metrics
 - stderr output
 - kill all workers on exit
+- component evaluation
 
 # TODO (code)
 - nodes import+exporting.

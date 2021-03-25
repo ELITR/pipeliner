@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 import networkx as nx
+import SLTev.index_parser as index_parser
 import psutil
 import socket
 import os
@@ -308,37 +309,39 @@ class Pipeliner:
 
   def createEvaluations(self, hostDirectory, containerDirectory, testsetDirectory):
     for component in self._components:
-      evaluationFiles = subprocess.run(["SLTIndexParser", component.indexFile, testsetDirectory], stdout=subprocess.PIPE).stdout.decode()
-      if len(evaluationFiles) < 1:
-        raise Exception(f"Index {component.indexFile} has no files to evaluate")
-      pairs = [pair.split("\t") for pair in evaluationFiles.rstrip().split("\n")]
-      for pair in pairs:
-        source, reference = pair
-        sourceFileName = os.path.basename(source)
 
+      evaluationDicts = index_parser.parseIndexFile(component.indexFile, testsetDirectory)
+      for evaluationDict in evaluationDicts:
+
+        # Create the directory for the file to be evaluated
+        sourceFileName = os.path.basename(evaluationDict["SRC"])
         hostEvaluationPath = f"{hostDirectory}/{component.name}/{sourceFileName}"
         os.makedirs(hostEvaluationPath, exist_ok=True)
-        shutil.copy(source, f"{hostEvaluationPath}/SOURCE")
-        shutil.copy(reference, f"{hostEvaluationPath}/REFERENCE")
 
-        containerEvaluationPath = f"{containerDirectory}/{component.name}/{sourceFileName}"
+        # Copy the files
+        for name, path in evaluationDict.items():
+          shutil.copy(path, f"{hostEvaluationPath}/{name}")
+          shutil.copy(path, f"{hostEvaluationPath}/{name}")
+
       
-        entryNode = self.addLocalNode(f"fileInputNode-{sourceFileName}", {}, {"fileOutput": "stdout"}, f"cat ./SOURCE")
+        entryNode = self.addLocalNode(f"fileInputNode-{sourceFileName}", {}, {"fileOutput": "stdout"}, f"cat ./SRC")
         self.graph.add_edge(entryNode, component.sourceNode, info={
           "from": "fileOutput",
           "to": component.sourceInput,
-          "name": f"fileOutput2{component.sourceInput}",
+          "name": f"SRC2{component.sourceInput}",
           "type": "text"
         })
-        exitNode = self.addLocalNode(f"exitNode-{sourceFileName}", {"output": "stdin"}, {}, f"cat > ./RESULT")
+        exitNode = self.addLocalNode(f"exitNode-{sourceFileName}", {"output": "stdin"}, {}, f"cat > ./RES")
         self.graph.add_edge(component.targetNode, exitNode, info={
           "from": component.targetOutput,
           "to": "output",
-          "name": f"{component.targetOutput}2RESULT",
+          "name": f"{component.targetOutput}2RES",
           "type": "text"
         })
         path = nx.algorithms.shortest_path(self.graph, entryNode, exitNode)
 
+        # Location of the files in the container (bindmounted dir location)
+        containerEvaluationPath = f"{containerDirectory}/{component.name}/{sourceFileName}"
         pipeline = Pipeline(copy.deepcopy(self.graph.subgraph(path)), containerEvaluationPath)
         commands = pipeline.createPipeline(mode=None)
         commands.append("""
