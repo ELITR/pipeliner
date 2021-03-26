@@ -331,11 +331,11 @@ class Pipeliner:
           "name": f"SRC2{component.sourceInput}",
           "type": "text"
         })
-        exitNode = self.addLocalNode(f"exitNode-{sourceFileName}", {"output": "stdin"}, {}, f"cat > ./RES")
+        exitNode = self.addLocalNode(f"exitNode-{sourceFileName}", {"output": "stdin"}, {}, f"cat > ./OUT")
         self.graph.add_edge(component.targetNode, exitNode, info={
           "from": component.targetOutput,
           "to": "output",
-          "name": f"{component.targetOutput}2RES",
+          "name": f"{component.targetOutput}2OUT",
           "type": "text"
         })
         path = nx.algorithms.shortest_path(self.graph, entryNode, exitNode)

@@ -126,7 +126,7 @@ audioRecording = p.addLocalNode("audioRecording", {}, {"audiorecord": "stdout"},
 and then from the host machine, run `arecord -f S16_LE -c1 -r 16000 -t raw -D default | nc localhost 5000`, which transmits the audio to the container. One upside of this port-based approach is you can start and stop the `arecord` without bringing the whole pipeline down. 
 
 # Evaluation
-Pipeliner supports evaluation of parts of the pipeline using SLTev. A part of a pipeline that is evaluated is called a `component`. First, specify the components you want to evaluate. Provide the start node (the one consuming the input) and the end node (the one outputting the results to be evaluated), along with the input and output names. Specify the path to the index file, and the type of the component (`slt, mt, asr`). The type determines how the resulting files are going to be evaluated with SLTev.
+Pipeliner supports evaluation of parts of the pipeline using SLTev. A part of a pipeline that is evaluated is called a `component`. First, specify the components you want to evaluate. Provide the start node (the one consuming the input) and the end node (the one outputting the results to be evaluated), along with the input and output names. Specify the path to the index file, and the type of the component (`slt, mt, asr`). The type determines how the resulting files are going to be evaluated with SLTev. See the full example in the `examples/` directory.
 
 ```python
 p.addComponent(componentName, startNode, inputName, endNode, outputName, indexFile, type)
@@ -139,8 +139,10 @@ p.createEvaluations(hostDirectory, containerDirectory, testsetDirectory)
 ```
 
 - `hostDirectory` is the folder on the host where the directories for evaluation purposes are going to be generated. Each component will get it's folder and each file in the corresponding index file will also get it's folder.
-- `containerDirectory` is where the hostDirectory is bind-mounted to the container.
+- `containerDirectory` is where the hostDirectory is bind-mounted to the container. This is so the pipeline script knows where to store log files for the pipeline execution.
 - `testsetDirectory` is the base location of the path the index file refers to. For example, SLTEv index files look like this: `elitr-testset/documents/wmt18-newstest-sample-read`. `testsetDirectory` would then be a folder containing the `elitr-testset` folder on the host.
+
+If the pipelines won't be executed in the container, simply set the `containerDirectory` to the same value as the `hostDirectory`. 
 
 Each final folder (of a file of a component) will contain `SRC`, `REF` and `pipeline.sh` files, and possibly some other files used for the evaluation. The `pipeline.sh` is a pipeline that stores the results of processing the `SRC` file  to a `RES` file.
 
