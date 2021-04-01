@@ -215,7 +215,7 @@ done
     commands += self._createPipes()
 
     allCommands = [(" &\n".join(commands)  + " &")]
-    allCommands += self._prologue()
+    allCommands = self._prologue() + allCommands
     allCommands += self._reportEntrypoints()
 
     allCommands.append(f"cp $0 {self.logsDir}") # make a copy of the script
