@@ -6,6 +6,7 @@ This repository contains tools to create and execute a *pipeline* -- various com
 - networkx 
 - (optional, for visualization) matplotlib
 - SLTev installed (when using component evaluation)
+- `ss` command (located in `iproute2` package)
 
 `pip install -r requirements.txt`
 
@@ -112,6 +113,14 @@ By default, every edge is logged with timestamps per each row. To change this be
 - "text": Timestamps per row. Suffix: `.log`.
 
 Stderr of each vertex is also captured by default. They're labeled in DFS-preorder order.
+
+## Free ports
+If you need to grab a port that is guaranteed to be free, use the `AVAILABLE_PORTS` global variable in the `pipeliner` script.
+
+```python
+from pipeliner import AVAILABLE_PORTS
+free_port = AVAILABLE_PORTS.pop()
+```
 
 ## Visualization
 To see a (bit crude) visualization of the created graph, use `p.draw` (make sure you got `matplotlib` installed).
