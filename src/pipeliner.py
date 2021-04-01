@@ -1,12 +1,9 @@
 #!/usr/bin/python3
 import networkx as nx
 import SLTev.index_parser as index_parser
-import psutil
-import socket
 import os
 import time
 import copy
-import subprocess
 import shutil
 import matplotlib.pyplot as plt
 from functools import reduce
@@ -359,7 +356,7 @@ done
         with open(f"{hostEvaluationPath}/pipeline.sh", "w+") as pipeline:
           pipeline.writelines([c + "\n" for c in commands])
       
-  def createPipeline(self, mode):
+  def createPipeline(self):
     pipeline = Pipeline(copy.deepcopy(self.graph), self.logsDir)
     commands = pipeline.createPipeline()
     for command in commands:
