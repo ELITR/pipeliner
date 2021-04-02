@@ -29,7 +29,7 @@ class Pipeline:
   
   # Wait for the port to open, before actually connecting to it.
   def _netcat(self, port):
-    return f"(while ! ss -lt | grep -q 127.0.0.1:{port}; do sleep 1; done; nc -q 1 localhost {port})"
+    return f"(while ! ss -lt | grep -q -P \"(127\.0\.0\.1|0\.0\.0\.0|\[::1\]):{port}\"; do sleep 1; done; nc -q 1 localhost {port})"
 
   # Without the -k flag, nc will exit after being probed by another nc with -z flag.
   def _netcatListen(self, port):
@@ -313,6 +313,7 @@ class Pipeliner:
         # Create the directory for the file to be evaluated
         sourceFileName = os.path.basename(evaluationDict["SRC"])
         hostEvaluationPath = f"{hostDirectory}/{component.name}/{sourceFileName}"
+        containerEvaluationPath = f"{os.path.realpath(containerDirectory)}/{component.name}/{sourceFileName}"
         os.makedirs(hostEvaluationPath, exist_ok=True)
 
         # Copy the files
@@ -321,14 +322,14 @@ class Pipeliner:
           shutil.copy(path, f"{hostEvaluationPath}/{name}")
 
       
-        entryNode = self.addLocalNode(f"fileInputNode-{sourceFileName}", {}, {"fileOutput": "stdout"}, f"cat ./SRC")
+        entryNode = self.addLocalNode(f"fileInputNode-{sourceFileName}", {}, {"fileOutput": "stdout"}, f"ffmpeg -i {containerEvaluationPath}/SRC -f s16le -acodec pcm_s16le -")
         self.graph.add_edge(entryNode, component.sourceNode, info={
           "from": "fileOutput",
           "to": component.sourceInput,
           "name": f"SRC2{component.sourceInput}",
-          "type": "text"
+          "type": "text" if component.type == "mt" else "binary"
         })
-        exitNode = self.addLocalNode(f"exitNode-{sourceFileName}", {"output": "stdin"}, {}, f"cat > ./OUT")
+        exitNode = self.addLocalNode(f"exitNode-{sourceFileName}", {"output": "stdin"}, {}, f"cat > {containerEvaluationPath}/OUT")
         self.graph.add_edge(component.targetNode, exitNode, info={
           "from": component.targetOutput,
           "to": "output",
@@ -338,16 +339,16 @@ class Pipeliner:
         path = nx.algorithms.shortest_path(self.graph, entryNode, exitNode)
 
         # Location of the files in the container (bindmounted dir location)
-        containerEvaluationPath = f"{containerDirectory}/{component.name}/{sourceFileName}"
         pipeline = Pipeline(copy.deepcopy(self.graph.subgraph(path)), containerEvaluationPath)
         commands = pipeline.createPipeline(mode=None)
-        commands.append("""
+        commands.append(f"""
+touch {containerEvaluationPath}/OUT
 while :; do
-  lastModificationSeconds=$(date +%s -r RESULT)
+  lastModificationSeconds=$(date +%s -r {containerEvaluationPath}/OUT)
   currentSeconds=$(date +%s)
   elapsedSeconds=$((currentSeconds - lastModificationSeconds))
   if (( elapsedSeconds > 30 )); then
-    echo "30 seconds from last write to the result file, shutting down in 30 seconds..."
+    echo $(date) "30 seconds from last write to the result file, shutting down in 30 seconds..."
     sleep 30
     kill -SIGINT $$
   fi
