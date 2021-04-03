@@ -158,9 +158,9 @@ Each final folder (of a file of a component) will contain `SRC`, `REF` and `pipe
 ## Running on cluster
 `qruncmd` (from https://github.com/ufal/ufal-tools) is a tool to execute multiple jobs in parallel on the UFAL cluster. Run the following command and substitute `<MAX_JOBS>` for the count of maximum jobs that can be ran at once (typically limited by a worker on Mediator). Run the command in the dir where the pipelines are generated (typically `containerDirectory`), or change the `find` command appropriately.
 
-Make sure your `PATH` contains all of the tools used in the pipeline -- this usually means having the `ebclient` to connect to the mediator. You can use Vojtech's virtualenv that has all the Python tools needed to execute the pipeliner: `source /home/srdecny/personal_work_ms/evaluation/.venv/bin/activate`. 
+`find ~+ -name pipeline.sh | qruncmd --jobs=<MAX_JOBS> --split-to-size=1 --logdir=<LOG_DIR> bash`
 
-`find . -name pipeline.sh | qruncmd --jobs=<MAX_JOBS> --split-to-size=1 --logdir=<LOG_DIR> bash`
+Make sure your `PATH` contains all of the tools used in the pipeline -- this usually means having the `ebclient` to connect to the mediator. You can use Vojtech's virtualenv that has all the Python tools needed to execute the pipeliner: `source /home/srdecny/personal_work_ms/evaluation/.venv/bin/activate`. 
 
 If you don't want to receive emails when a job crashes, use this parameter: `--sge-flags="-m n"`.
 
