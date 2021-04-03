@@ -165,7 +165,7 @@ Make sure your `PATH` contains all of the tools used in the pipeline -- this usu
 If you don't want to receive emails when a job crashes, use this parameter: `--sge-flags="-m n"`.
 
 ## Pipeline termination
-Currently, the pipeline watches the `RES` file and when it hasn't been modified for 30 seconds, it waits for another 30 seconds and then terminates the pipeline. This mechanism is not final and it's certainly possible the numbers are wrong.
+Currently, the pipeline watches the `OUT` file and when it hasn't been modified for 30 seconds, it waits for another 30 seconds and then terminates the pipeline. This mechanism is not final and it's certainly possible the numbers are wrong.
 
 # Development
 There's a `docker-compose.yaml` file included in the repo intended for developmental work. It's main use is to bind-mount the Python scripts to the cruise-control image, so the compiled tools are available for debugging when developing.
