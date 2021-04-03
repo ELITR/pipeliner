@@ -5,6 +5,7 @@ import os
 import time
 import copy
 import shutil
+import stat
 import matplotlib.pyplot as plt
 from functools import reduce
 from collections import Counter
@@ -194,9 +195,23 @@ done
     return pipes
 
   # Catch SIGINT and properly terminate all children.
+  # https://aweirdimagination.net/2020/06/28/kill-child-jobs-on-script-exit/
   def _prologue(self):
     return [
-      """trap "trap - SIGTERM && kill -- -$$" SIGINT SIGTERM EXIT""",
+      """
+cleanup() {
+    # kill all processes whose parent is this process
+    pkill -P $$
+}
+
+for sig in INT QUIT HUP TERM; do
+  trap "
+    cleanup
+    trap - $sig EXIT
+    kill -s $sig "'"$$"' "$sig"
+done
+trap cleanup EXIT
+      """,
       """DATE=$(date '+%Y%m%d-%H%M%S')""",
       f"mkdir -p {self.logsDir}"""
     ]
@@ -350,12 +365,17 @@ while :; do
   if (( elapsedSeconds > 30 )); then
     echo $(date) "30 seconds from last write to the result file, shutting down in 30 seconds..."
     sleep 30
-    kill -SIGINT $$
+    cleanup
+    break
   fi
 done
         """)
         with open(f"{hostEvaluationPath}/pipeline.sh", "w+") as pipeline:
           pipeline.writelines([c + "\n" for c in commands])
+
+        # Make the pipeline executable, useful for executing it on the cluster
+        st = os.stat(f"{hostEvaluationPath}/pipeline.sh")
+        os.chmod(f"{hostEvaluationPath}/pipeline.sh", st.st_mode | stat.S_IEXEC)
       
   def createPipeline(self):
     pipeline = Pipeline(copy.deepcopy(self.graph), self.logsDir)

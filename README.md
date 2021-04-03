@@ -155,6 +155,15 @@ If the pipelines won't be executed in the container, simply set the `containerDi
 
 Each final folder (of a file of a component) will contain `SRC`, `REF` and `pipeline.sh` files, and possibly some other files used for the evaluation. The `pipeline.sh` is a pipeline that stores the results of processing the `SRC` file  to a `RES` file.
 
+## Running on cluster
+`qruncmd` (from https://github.com/ufal/ufal-tools) is a tool to execute multiple jobs in parallel on the UFAL cluster. Run the following command and substitute `<MAX_JOBS>` for the count of maximum jobs that can be ran at once (typically limited by a worker on Mediator). Run the command in the dir where the pipelines are generated (typically `containerDirectory`), or change the `find` command appropriately.
+
+Make sure your `PATH` contains all of the tools used in the pipeline -- this usually means having the `ebclient` to connect to the mediator.
+
+`find . -name pipeline.sh | qruncmd --jobs=<MAX_JOBS> --split-to-size=1 --logdir=<LOG_DIR> bash`
+
+If you don't want to receive emails when a job crashes, use this parameter: `--sge-flags="-m n"`.
+
 ## Pipeline termination
 Currently, the pipeline watches the `RES` file and when it hasn't been modified for 30 seconds, it waits for another 30 seconds and then terminates the pipeline. This mechanism is not final and it's certainly possible the numbers are wrong.
 
