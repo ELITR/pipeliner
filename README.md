@@ -5,6 +5,8 @@ This repository contains tools to create and execute a *pipeline* -- various com
 - Python 3
 - networkx 
 - (optional, for visualization) matplotlib
+- SLTev installed (when using component evaluation)
+- `ss` command (located in `iproute2` package)
 
 `pip install -r requirements.txt`
 
@@ -112,6 +114,14 @@ By default, every edge is logged with timestamps per each row. To change this be
 
 Stderr of each vertex is also captured by default. They're labeled in DFS-preorder order.
 
+## Free ports
+If you need to grab a port that is guaranteed to be free, use the `AVAILABLE_PORTS` global variable in the `pipeliner` script.
+
+```python
+from pipeliner import AVAILABLE_PORTS
+free_port = AVAILABLE_PORTS.pop()
+```
+
 ## Visualization
 To see a (bit crude) visualization of the created graph, use `p.draw` (make sure you got `matplotlib` installed).
 
@@ -124,6 +134,39 @@ audioRecording = p.addLocalNode("audioRecording", {}, {"audiorecord": "stdout"},
 ```
 and then from the host machine, run `arecord -f S16_LE -c1 -r 16000 -t raw -D default | nc localhost 5000`, which transmits the audio to the container. One upside of this port-based approach is you can start and stop the `arecord` without bringing the whole pipeline down. 
 
+# Evaluation
+Pipeliner supports evaluation of parts of the pipeline using SLTev. A part of a pipeline that is evaluated is called a `component`. First, specify the components you want to evaluate. Provide the start node (the one consuming the input) and the end node (the one outputting the results to be evaluated), along with the input and output names. Specify the path to the index file, and the type of the component (`slt, mt, asr`). The type determines how the resulting files are going to be evaluated with SLTev. See the full example in the `examples/` directory.
+
+```python
+p.addComponent(componentName, startNode, inputName, endNode, outputName, indexFile, type)
+```
+
+Once all components are added, the following command will prepare the files for evaluation. 
+
+```python
+p.createEvaluations(hostDirectory, containerDirectory, testsetDirectory)
+```
+
+- `hostDirectory` is the folder on the host where the directories for evaluation purposes are going to be generated. Each component will get it's folder and each file in the corresponding index file will also get it's folder.
+- `containerDirectory` is where the hostDirectory is bind-mounted to the container. This is so the pipeline script knows where to store log files for the pipeline execution.
+- `testsetDirectory` is the base location of the path the index file refers to. For example, SLTEv index files look like this: `elitr-testset/documents/wmt18-newstest-sample-read`. `testsetDirectory` would then be a folder containing the `elitr-testset` folder on the host.
+
+If the pipelines won't be executed in the container, simply set the `containerDirectory` to the same value as the `hostDirectory`. 
+
+Each final folder (of a file of a component) will contain `SRC`, `REF` and `pipeline.sh` files, and possibly some other files used for the evaluation. The `pipeline.sh` is a pipeline that stores the results of processing the `SRC` file  to a `RES` file.
+
+## Running on cluster
+`qruncmd` (from https://github.com/ufal/ufal-tools) is a tool to execute multiple jobs in parallel on the UFAL cluster. Run the following command and substitute `<MAX_JOBS>` for the count of maximum jobs that can be ran at once (typically limited by a worker on Mediator). Run the command in the dir where the pipelines are generated (typically `containerDirectory`), or change the `find` command appropriately.
+
+`find ~+ -name pipeline.sh | qruncmd --jobs=<MAX_JOBS> --split-to-size=1 --logdir=<LOG_DIR> bash`
+
+Make sure your `PATH` contains all of the tools used in the pipeline -- this usually means having the `ebclient` to connect to the mediator. You can use Vojtech's virtualenv that has all the Python tools needed to execute the pipeliner: `source /home/srdecny/personal_work_ms/evaluation/.venv/bin/activate`. 
+
+If you don't want to receive emails when a job crashes, use this parameter: `--sge-flags="-m n"`.
+
+## Pipeline termination
+Currently, the pipeline watches the `OUT` file and when it hasn't been modified for 30 seconds, it waits for another 30 seconds and then terminates the pipeline. This mechanism is not final and it's certainly possible the numbers are wrong.
+
 # Development
 There's a `docker-compose.yaml` file included in the repo intended for developmental work. It's main use is to bind-mount the Python scripts to the cruise-control image, so the compiled tools are available for debugging when developing.
 
@@ -131,6 +174,7 @@ There's a `docker-compose.yaml` file included in the repo intended for developme
 - metrics
 - stderr output
 - kill all workers on exit
+- component evaluation
 
 # TODO (code)
 - nodes import+exporting.

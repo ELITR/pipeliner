@@ -1,0 +1,9 @@
+# files from one document collection:
+# SRC -> *.en.OSt
+# REF -> *.cs.OSt
+elitr-testset/documents/wmt18-newstest-sample-read
+
+# files from another document collection
+# SRC -> *.en
+# REF -> *.cs
+elitr-testset/documents/wmt19-elitr-testsuite/reference
