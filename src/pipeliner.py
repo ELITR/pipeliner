@@ -30,7 +30,7 @@ class Pipeline:
   
   # Wait for the port to open, before actually connecting to it.
   def _netcat(self, port):
-    return f"(while ! ss -lt | grep -q -P \"(127\.0\.0\.1|0\.0\.0\.0|\[::1\]):{port}\"; do sleep 1; done; nc -q 1 localhost {port})"
+    return f"(while ! ss -ltn | grep -q -P \"(127\.0\.0\.1|0\.0\.0\.0|\[::1\]):{port}\"; do sleep 1; done; nc -q 1 localhost {port})"
 
   # Without the -k flag, nc will exit after being probed by another nc with -z flag.
   def _netcatListen(self, port):
