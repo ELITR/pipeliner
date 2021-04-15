@@ -76,9 +76,13 @@ Because most of the edges are between vertices that have a single output and a s
 p.addSimpleEdge(uppercaser, logger)
 ```
 
-## Forking
+## From Pipelines to Directed Acyclic Graphs
 
-Suppose we want to add another logger. Simply create another node and edge, and the `Pipeliner` will automatically split the data.
+Pipeliner allows to construct complex setups, beyond a linear chain of producers and consumers.
+
+### Pipeline Forking
+
+Suppose we want to add another logger. Simply create another node and edge, and the `Pipeliner` will automatically "fork" the pipeline and send the data to all paths.
 
 ```python
 logger2 = p.addLocalNode("logger2", {"toBeLogged": "stdin"}, {}, "cat >/tmp/saved2.txt")
@@ -97,6 +101,19 @@ nc -lk localhost 9198 | (while ! nc -z localhost 9196; do sleep 1; done; nc loca
 ```
 Observe that the output of `tr` is captured to two ports, `9198` and `9197`, which are eventually connected to the loggers.
 
+### Pipeline Merging
+
+The converse of forking is merging, taking multiple inputs and producing a single output.
+
+Specifying such a merge at the level of the abstract pipeline is easy, simply list multiple items in the Ingress list of a node (one of them can be ``stdin``, others have to be ports).
+
+Unlike forking, which can be done simply by duplicating the content, merging requires application-dependent logic, so the code you implement has to somehow handle the more incoming streams. It is up to the provided code to ensure correct data processing including the avoidance of deadlocks.
+
+We provide an example of pipeline merging using a simple tool ``octocat.py`` which is included with `Pipeliner` in ``src/``. Octocat is a manually-controlled `cat`, which allows to dynamically switch the input stream while the pipeline is running.
+
+Octocat is line-oriented.
+
+The manual steering happens in an "octocat directory" where the input streams get printed to "preview" files, and by writing the name of one of the streams, the user can select which of them should be passed to the output at any point in time.
 
 ## Logging
 To enable automated logging, first provide the directory where the logs should be stored to `Pipeliner`'s constructor (default is `/dev/null`, i.e. no logs). A subdirectory with the current timestamp will be created.
