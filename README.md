@@ -109,7 +109,7 @@ Specifying such a merge at the level of the abstract pipeline is easy, simply li
 
 Unlike forking, which can be done simply by duplicating the content, merging requires application-dependent logic, so the code you implement has to somehow handle the more incoming streams. It is up to the provided code to ensure correct data processing including the avoidance of deadlocks.
 
-We provide an example of pipeline merging using a simple tool ``octocat.py`` which is included with `Pipeliner` in ``src/``. Octocat is a manually-controlled `cat`, which allows to dynamically switch the input stream while the pipeline is running.
+We provide an example of pipeline merging using a simple tool ``octocat.py`` which is included with `Pipeliner` in ``src/``. Octocat is a manually-controlled `cat`, which allows to dynamically switch the input stream while the pipeline is running. ``src/octocat-sample-dir/README.md`` contains a guide how to work with octocat.
 
 Octocat is line-oriented.
 
