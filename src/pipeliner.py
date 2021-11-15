@@ -189,7 +189,8 @@ done
       portFrom = edge[0].egress[edgeFrom].pop()
       portTo = edge[1].ingress[edgeTo].pop()
       if len(teeArgs) > 0:
-        pipes.append(f"{self._netcatListen(portFrom)} | tee {' '.join(teeArgs)} | {self._netcat(portTo)}")
+        stdbuf_type = "-oL" if edgeType == "text" else "-o0"
+        pipes.append(f"{self._netcatListen(portFrom)} | stdbuf {stdbuf_type} tee {' '.join(teeArgs)} | {self._netcat(portTo)}")
       else:
         pipes.append(f"{self._netcatListen(portFrom)} | {self._netcat(portTo)}")
 
