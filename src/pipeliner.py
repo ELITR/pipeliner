@@ -6,7 +6,6 @@ import time
 import copy
 import shutil
 import stat
-import matplotlib.pyplot as plt
 from functools import reduce
 from collections import Counter
 from datetime import datetime
@@ -39,7 +38,7 @@ class Pipeline:
 
   # Redirect tee's stdout to /dev/null, or it's going to pollute the console
   def _splitOutputs(self, portsTo):
-    return reduce(lambda acc,port: acc + f">{self._netcat(port)} ", portsTo, f"tee ") + "1>/dev/null"
+    return reduce(lambda acc,port: acc + f">{self._netcat(port)} ", portsTo, f"stdbuf -oL tee ") + "1>/dev/null"
   
   # If an output is consumed by more than one input, the output needs to be duplicated that many times using tee
   # Similarly, if an output is also an input (in case of ports), a proxy port needs to be used to allow output duplicating
@@ -390,11 +389,3 @@ done
     commands = pipeline.createPipeline()
     for command in commands:
       print(command)
-
-  def draw(self):
-    plt.subplot()
-    pos = nx.spring_layout(self.graph)
-    labels = {node: node.name for node in self.graph.nodes}
-    nx.draw(self.graph, pos, labels=labels, with_labels=True, arrowsize=30, font_size=20)
-    nx.draw_networkx_edge_labels(self.graph, pos)
-    plt.show()
